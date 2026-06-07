@@ -1,16 +1,17 @@
-# C:\LLM Eval Harness\llm_eval_harness\tests\conftest.py
+# tests/conftest.py
 import pytest
 from django_tenants.utils import schema_context
 
 DEMO_SCHEMA = "demo"
+DEMO_DOMAIN = "demo.localhost"
 
 
 @pytest.fixture(scope="session")
 def django_db_setup(django_db_setup, django_db_blocker):
     """
-    Extends pytest-django's default DB setup to ensure the demo tenant row and
-    schema exist before any test runs.  The parameter 'django_db_setup' resolves
-    to the plugin-provided fixture (not this one), so there is no circular ref.
+    Extends pytest-django's DB setup to create the demo tenant once per
+    test session.  Uses django_db_blocker so the write is committed and
+    visible to all subsequent tests.
     """
     with django_db_blocker.unblock():
         with schema_context("public"):
@@ -21,7 +22,7 @@ def django_db_setup(django_db_setup, django_db_blocker):
                 defaults={"name": "Demo Tenant"},
             )
             Domain.objects.get_or_create(
-                domain="demo.localhost",
+                domain=DEMO_DOMAIN,
                 tenant=tenant,
                 defaults={"is_primary": True},
             )
@@ -30,8 +31,8 @@ def django_db_setup(django_db_setup, django_db_blocker):
 @pytest.fixture
 def tenant_schema(db):
     """
-    Activate the demo tenant schema for the duration of a single test.
-    All ORM queries inside the test will target the 'demo' PostgreSQL schema.
+    Activate the demo tenant schema for the duration of one test.
+    All ORM queries inside the test run against the 'demo' PostgreSQL schema.
     """
     with schema_context(DEMO_SCHEMA):
         yield DEMO_SCHEMA
@@ -40,9 +41,10 @@ def tenant_schema(db):
 @pytest.fixture
 def client(tenant_schema):
     """
-    Django test client pre-configured with the Host header that the
+    Django test client pre-configured with the Host header that
     TenantMainMiddleware uses to resolve the demo tenant.
+    Depends on tenant_schema so the schema is active before any request.
     """
     from django.test import Client
 
-    return Client(HTTP_HOST="demo.localhost")
+    return Client(HTTP_HOST=DEMO_DOMAIN)

@@ -5,7 +5,7 @@ from ninja import NinjaAPI, Router
 
 from apps.evals.router import router as evals_router
 
-api = NinjaAPI(title="LLM Eval Harness", version="1.0.0", docs_url="/api/docs")
+api = NinjaAPI(title="LLM Eval Harness", version="1.0.0", docs_url="/docs")
 
 # ── Health check ──────────────────────────────────────────────────────────────
 health_router = Router(tags=["health"])
@@ -21,5 +21,5 @@ api.add_router("/evals", evals_router)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", api.urls),
+    path("api/", api.urls),
 ]

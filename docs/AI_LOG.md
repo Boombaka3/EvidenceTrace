@@ -87,3 +87,22 @@ Three runtime bug fixes (all confirmed by audit) + admin registration.
 `manage.py check` and `scripts/preflight.py` both pass after these changes.
 
 ---
+
+## Phase 3 -- 2026-06-07
+
+End-to-end scripts + pytest suite. 23 tests, all passing.
+
+- `scripts/first_run.py`: orchestrates migrate, seed, preflight in sequence
+- `scripts/smoke_test.py`: hits live API end-to-end (httpx, Host: demo.localhost)
+- `tests/conftest.py`: session-scoped demo tenant creation, tenant_schema, client fixtures
+- `tests/evals/conftest.py`: pytestmark = pytest.mark.django_db for all evals tests
+- `tests/evals/test_models.py`: 5 tests (suite create, FK constraint, status default, nullable, __str__)
+- `tests/evals/test_schemas.py`: 4 tests (valid, missing name, empty models, rubric shape)
+- `tests/evals/test_scoring.py`: 6 tests (exact_match x3, regression x3 with mocked llm_judge)
+- `tests/evals/test_api.py`: 8 tests (health, CRUD, run, status, regression 400, models list)
+- `apps/evals/schemas.py`: added field_validator to EvalRunIn rejecting empty model_ids
+- `config/urls.py`: API mounted at api/ (was root); docs_url fixed to /docs
+- `scoring/regression.py`: additional round(delta) None guard (follow-on to Phase 2.5 fix)
+- `pyproject.toml`: pytest addopts, python_classes/functions, markers added
+
+---

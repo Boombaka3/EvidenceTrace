@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from ninja import Schema
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 
 
 # ── EvalSuite ─────────────────────────────────────────────────────────────────
@@ -67,6 +67,13 @@ class EvalRunIn(Schema):
     model_ids: list[str]
     score_mode: str = "llm_judge"
     baseline_run_id: int | None = None
+
+    @field_validator("model_ids")
+    @classmethod
+    def model_ids_not_empty(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("model_ids must not be empty")
+        return v
 
 
 class EvalRunOut(Schema):
