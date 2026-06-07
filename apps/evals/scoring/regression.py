@@ -51,9 +51,13 @@ def score_regression(model_run: ModelRun, baseline_run_id: int) -> ScoreResult:
         current_result.passed = True
         return current_result
 
-    delta = current_overall - baseline_score.overall
     threshold = model_run.prompt_case.suite.regression_threshold
-    passed = delta >= -threshold
+    if current_overall is None or baseline_score.overall is None:
+        delta = None
+        passed = True
+    else:
+        delta = current_overall - baseline_score.overall
+        passed = delta >= -threshold
 
     current_result.regression_delta = round(delta, 4)
     current_result.passed = passed

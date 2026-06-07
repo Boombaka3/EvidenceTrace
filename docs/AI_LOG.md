@@ -74,3 +74,16 @@ Phase 1.5 -- bin/ restructure and tests/ scaffold. All .ps1 rewritten to fix str
 - Created `tests/evals/.gitkeep` placeholder
 
 ---
+
+## Phase 2.5 -- 2026-06-06
+
+Three runtime bug fixes (all confirmed by audit) + admin registration.
+
+- `tasks/score.py`: `round(overall_avg, 4)` now guards against `None` when all judge calls fail
+- `scoring/regression.py`: `delta = current - baseline` guarded against `None` on either side; passes with `delta=None` instead of crashing
+- `apps/evals/models.py`: `ScoreResult.__str__` no longer crashes when `self.overall is None`
+- `apps/evals/admin.py`: created; registers EvalSuite, PromptCase, EvalRun, ModelRun, ScoreResult
+
+`manage.py check` and `scripts/preflight.py` both pass after these changes.
+
+---

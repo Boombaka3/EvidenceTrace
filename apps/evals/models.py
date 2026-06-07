@@ -140,4 +140,5 @@ class ScoreResult(models.Model):
         app_label = "evals"
 
     def __str__(self) -> str:
-        return f"ScoreResult for ModelRun {self.model_run_id} overall={self.overall:.2f}"
+        overall = f"{self.overall:.2f}" if self.overall is not None else "None"
+        return f"ScoreResult for ModelRun {self.model_run_id} overall={overall}"

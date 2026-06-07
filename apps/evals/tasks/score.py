@@ -63,7 +63,7 @@ def score_all_results(self, eval_run_id: int, schema_name: str) -> None:
                 "run_id": eval_run_id,
                 "suite_id": eval_run.suite_id,
                 "score_mode": score_mode,
-                "overall_avg": round(overall_avg, 4),
+                "overall_avg": round(overall_avg, 4) if overall_avg is not None else None,
                 "results": [
                     {
                         "model_run_id": r.model_run_id,
