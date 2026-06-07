@@ -88,6 +88,22 @@ Three runtime bug fixes (all confirmed by audit) + admin registration.
 
 ---
 
+## Phase 2.5 fix — Celery autodiscovery — 2026-06-07
+
+Celery worker started but registered zero app tasks. Root cause was three compounding issues:
+
+- `apps/evals/tasks/__init__.py` was empty (0 bytes) — autodiscovery finds the package but imports nothing, so no `@shared_task` decorator fires
+- `autodiscover_tasks(lambda: settings.INSTALLED_APPS)` lambda pattern is unreliable in Celery 5 (deferred signal, not immediate import)
+- Without `django.setup()` called before app construction, `django_tenants` fails silently on import, taking the entire tasks module with it
+
+Fix:
+- `apps/evals/tasks/__init__.py`: added explicit imports of all three task functions + `__all__`
+- `config/celery.py`: added `try: django.setup() except RuntimeError: pass` guard (needed because `config/__init__.py` imports `config/celery.py`, so this module runs during Django's own URL loading when setup is already done); changed to `autodiscover_tasks(["apps.evals"], force=True)` — explicit module list + `force=True` causes immediate import instead of deferred signal
+
+Verification: `uv run celery -A config worker --loglevel=info --pool=solo` confirmed `[tasks]` section shows `evals.dispatch_eval_run`, `evals.run_model`, `evals.score_all_results`.
+
+---
+
 ## Phase 3 -- 2026-06-07
 
 End-to-end scripts + pytest suite. 23 tests, all passing.
