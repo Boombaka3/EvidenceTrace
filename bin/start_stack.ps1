@@ -7,7 +7,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit
 }
 
-$env:DOCKER_HOST = 'npipe:////./pipe/rancher-desktop'
+$env:DOCKER_HOST = 'npipe:////./pipe/docker_engine'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 Set-Location $projectRoot
 

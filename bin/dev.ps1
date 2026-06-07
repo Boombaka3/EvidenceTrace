@@ -1,6 +1,6 @@
 # C:\LLM Eval Harness\llm_eval_harness\bin\dev.ps1
 
-$env:DOCKER_HOST = 'npipe:////./pipe/rancher-desktop'
+$env:DOCKER_HOST = 'npipe:////./pipe/docker_engine'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 Set-Location $projectRoot
 
@@ -34,7 +34,7 @@ Write-Host ''
 Write-Host 'Opening Django dev server window...' -ForegroundColor Yellow
 try {
     $q = "'"
-    $djangoCmd = 'Set-Location ' + $q + $projectRoot + $q + '; $env:DOCKER_HOST = ' + $q + 'npipe:////./pipe/rancher-desktop' + $q + '; Write-Host ' + $q + 'Django dev server' + $q + ' -ForegroundColor Cyan; uv run python manage.py runserver'
+    $djangoCmd = 'Set-Location ' + $q + $projectRoot + $q + '; $env:DOCKER_HOST = ' + $q + 'npipe:////./pipe/docker_engine' + $q + '; Write-Host ' + $q + 'Django dev server' + $q + ' -ForegroundColor Cyan; uv run python manage.py runserver'
     Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-Command', $djangoCmd)
     Write-Host '[OK] Django window opened' -ForegroundColor Green
 } catch {
@@ -46,7 +46,7 @@ try {
 Write-Host 'Opening Celery worker window...' -ForegroundColor Yellow
 try {
     $q = "'"
-    $celeryCmd = 'Set-Location ' + $q + $projectRoot + $q + '; $env:DOCKER_HOST = ' + $q + 'npipe:////./pipe/rancher-desktop' + $q + '; Write-Host ' + $q + 'Celery worker' + $q + ' -ForegroundColor Cyan; uv run celery -A config worker --loglevel=info --pool=solo'
+    $celeryCmd = 'Set-Location ' + $q + $projectRoot + $q + '; $env:DOCKER_HOST = ' + $q + 'npipe:////./pipe/docker_engine' + $q + '; Write-Host ' + $q + 'Celery worker' + $q + ' -ForegroundColor Cyan; uv run celery -A config worker --loglevel=info --pool=solo'
     Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-Command', $celeryCmd)
     Write-Host '[OK] Celery window opened' -ForegroundColor Green
 } catch {
