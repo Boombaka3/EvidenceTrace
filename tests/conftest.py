@@ -41,10 +41,18 @@ def tenant_schema(db):
 @pytest.fixture
 def client(tenant_schema):
     """
-    Django test client pre-configured with the Host header that
-    TenantMainMiddleware uses to resolve the demo tenant.
-    Depends on tenant_schema so the schema is active before any request.
+    Django test client pre-configured with the Host header and a test-user
+    API key so all protected endpoints pass authentication.
     """
+    from django.contrib.auth import get_user_model
     from django.test import Client
 
-    return Client(HTTP_HOST=DEMO_DOMAIN)
+    with schema_context("public"):
+        User = get_user_model()
+        user, _ = User.objects.get_or_create(
+            username="testuser",
+            defaults={"email": "test@gauntlet.local", "is_active": True},
+        )
+        api_key = user.api_key
+
+    return Client(HTTP_HOST=DEMO_DOMAIN, HTTP_X_API_KEY=api_key)

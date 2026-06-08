@@ -104,6 +104,22 @@ Verification: `uv run celery -A config worker --loglevel=info --pool=solo` confi
 
 ---
 
+## Phase 4a — Authentication + admin seeding — 2026-06-08
+
+API key auth and superuser bootstrap.
+
+- `apps/users/auth.py`: created `ApiKeyAuth(APIKeyHeader)` — looks up user by api_key in X-API-Key header
+- `apps/users/models.py`: added `api_key = CharField(max_length=64, unique=True, blank=True)`; `save()` auto-generates via `secrets.token_urlsafe(32)`
+- `apps/users/migrations/0002_add_api_key.py`: migration for api_key field
+- `apps/evals/router.py`: imported `ApiKeyAuth`; added `auth=api_key_auth` to all 11 protected endpoints; `/models/` stays public (no auth param)
+- `config/urls.py`: auth is per-endpoint only (global NinjaAPI auth skipped — it would block health check); health check remains public
+- `scripts/create_admin.py`: created — idempotent superuser + demo tenant seeder; reads DJANGO_SUPERUSER_* env vars; prints API key on completion
+- `scripts/first_run.py`: added DJANGO_SUPERUSER_PASSWORD pre-check (exits 1 if missing); added create_admin.py as final step
+- `.env.example`: added DJANGO_SUPERUSER_* and GAUNTLET_TENANT_* vars
+- `tests/conftest.py`: client fixture now creates testuser in public schema and passes X-API-Key header; all 23 tests pass
+
+---
+
 ## Phase 3 fix — smoke_test.py — 2026-06-07
 
 Phase 3 fix — smoke_test.py switched to exact_match for keyless verification;

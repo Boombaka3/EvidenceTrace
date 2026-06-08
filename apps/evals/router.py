@@ -6,6 +6,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.evals.models import EvalRun, EvalSuite, ModelRun, PromptCase, ScoreResult
+from apps.users.auth import ApiKeyAuth
 from apps.evals.schemas import (
     EvalRunIn,
     EvalRunOut,
@@ -22,6 +23,7 @@ from apps.evals.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+api_key_auth = ApiKeyAuth()
 router = Router(tags=["evals"])
 
 SUPPORTED_MODELS: list[str] = [
@@ -49,7 +51,7 @@ SUPPORTED_MODELS: list[str] = [
 
 # ── EvalSuite endpoints ───────────────────────────────────────────────────────
 
-@router.post("/suites/", response=EvalSuiteOut)
+@router.post("/suites/", response=EvalSuiteOut, auth=api_key_auth)
 def create_suite(request, data: EvalSuiteIn):
     suite = EvalSuite.objects.create(
         name=data.name,
@@ -61,18 +63,18 @@ def create_suite(request, data: EvalSuiteIn):
     return _suite_out(suite)
 
 
-@router.get("/suites/", response=list[EvalSuiteOut])
+@router.get("/suites/", response=list[EvalSuiteOut], auth=api_key_auth)
 def list_suites(request):
     return [_suite_out(s) for s in EvalSuite.objects.all()]
 
 
-@router.get("/suites/{suite_id}/", response=EvalSuiteOut)
+@router.get("/suites/{suite_id}/", response=EvalSuiteOut, auth=api_key_auth)
 def get_suite(request, suite_id: int):
     suite = _get_or_404(EvalSuite, suite_id)
     return _suite_out(suite)
 
 
-@router.patch("/suites/{suite_id}/", response=EvalSuiteOut)
+@router.patch("/suites/{suite_id}/", response=EvalSuiteOut, auth=api_key_auth)
 def patch_suite(request, suite_id: int, data: EvalSuitePatch):
     suite = _get_or_404(EvalSuite, suite_id)
     fields_changed = []
@@ -98,7 +100,7 @@ def patch_suite(request, suite_id: int, data: EvalSuitePatch):
 
 # ── PromptCase endpoints ──────────────────────────────────────────────────────
 
-@router.post("/suites/{suite_id}/cases/", response=PromptCaseOut)
+@router.post("/suites/{suite_id}/cases/", response=PromptCaseOut, auth=api_key_auth)
 def create_case(request, suite_id: int, data: PromptCaseIn):
     suite = _get_or_404(EvalSuite, suite_id)
     case = PromptCase.objects.create(
@@ -112,13 +114,13 @@ def create_case(request, suite_id: int, data: PromptCaseIn):
     return _case_out(case)
 
 
-@router.get("/suites/{suite_id}/cases/", response=list[PromptCaseOut])
+@router.get("/suites/{suite_id}/cases/", response=list[PromptCaseOut], auth=api_key_auth)
 def list_cases(request, suite_id: int):
     suite = _get_or_404(EvalSuite, suite_id)
     return [_case_out(c) for c in suite.cases.all()]
 
 
-@router.delete("/cases/{case_id}/")
+@router.delete("/cases/{case_id}/", auth=api_key_auth)
 def delete_case(request, case_id: int):
     case = _get_or_404(PromptCase, case_id)
     case.delete()
@@ -127,7 +129,7 @@ def delete_case(request, case_id: int):
 
 # ── EvalRun endpoints ─────────────────────────────────────────────────────────
 
-@router.post("/runs/", response=EvalRunOut)
+@router.post("/runs/", response=EvalRunOut, auth=api_key_auth)
 def create_run(request, data: EvalRunIn):
     suite = _get_or_404(EvalSuite, data.suite_id)
 
@@ -157,7 +159,7 @@ def create_run(request, data: EvalRunIn):
     return _run_out(eval_run)
 
 
-@router.get("/runs/{run_id}/", response=RunStatusOut)
+@router.get("/runs/{run_id}/", response=RunStatusOut, auth=api_key_auth)
 def get_run_status(request, run_id: int):
     eval_run = _get_or_404(EvalRun, run_id)
     total = eval_run.model_runs.count()
@@ -175,7 +177,7 @@ def get_run_status(request, run_id: int):
     )
 
 
-@router.get("/runs/{run_id}/results/", response=list[ScoreResultOut])
+@router.get("/runs/{run_id}/results/", response=list[ScoreResultOut], auth=api_key_auth)
 def get_run_results(request, run_id: int):
     eval_run = _get_or_404(EvalRun, run_id)
     results = (
@@ -187,7 +189,7 @@ def get_run_results(request, run_id: int):
     return [_score_out(sr) for sr in results]
 
 
-@router.get("/runs/{run_id}/regression/", response=RegressionReportOut)
+@router.get("/runs/{run_id}/regression/", response=RegressionReportOut, auth=api_key_auth)
 def get_regression_report(request, run_id: int):
     eval_run = _get_or_404(EvalRun, run_id)
     if not eval_run.baseline_run_id:
@@ -214,7 +216,7 @@ def get_regression_report(request, run_id: int):
     )
 
 
-@router.post("/runs/{run_id}/pin-baseline/")
+@router.post("/runs/{run_id}/pin-baseline/", auth=api_key_auth)
 def pin_baseline(request, run_id: int):
     eval_run = _get_or_404(EvalRun, run_id)
     suite = eval_run.suite

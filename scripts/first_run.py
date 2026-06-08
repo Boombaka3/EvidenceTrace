@@ -40,11 +40,19 @@ def run_step(label: str, cmd: list[str]) -> bool:
 
 
 def main() -> None:
+    if not os.environ.get("DJANGO_SUPERUSER_PASSWORD"):
+        print("ERROR: Set DJANGO_SUPERUSER_PASSWORD in .env before first run")
+        sys.exit(1)
+
     all_passed = True
     for label, cmd in STEPS:
         if not run_step(label, cmd):
             all_passed = False
             break
+
+    if all_passed:
+        if not run_step("create admin + API key", ["uv", "run", "python", "scripts/create_admin.py"]):
+            all_passed = False
 
     print()
     if all_passed:
