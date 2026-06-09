@@ -1,6 +1,7 @@
 # llm_eval_harness/config/urls.py
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
+from django.views.generic import TemplateView
 from ninja import NinjaAPI, Router
 
 from apps.evals.router import router as evals_router
@@ -22,4 +23,9 @@ api.add_router("/evals", evals_router)
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", api.urls),
+    re_path(
+        r"^(?!api/).*$",
+        TemplateView.as_view(template_name="index.html"),
+        name="frontend",
+    ),
 ]

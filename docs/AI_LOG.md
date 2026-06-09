@@ -130,6 +130,37 @@ llm_judge path added as optional skip when no API key present.
 
 ---
 
+## FE-1 through FE-4 -- React dashboard -- 2026-06-09
+
+Full React 19 + Vite + Tailwind frontend, built and served from Django.
+
+- `frontend/package.json`: React 19, react-router-dom 6, recharts, Vite 5, Tailwind v3
+- `frontend/vite.config.js`: functional config -- `base: '/static/frontend/'` in production, `/` in dev; build to `../staticfiles/frontend`; proxy `/api` to Django with `Host: demo.localhost`
+- `frontend/src/api/client.js`: 14 named async functions covering all backend endpoints; reads `VITE_API_KEY` + `VITE_API_BASE` from env; throws `Error` with backend message on non-2xx
+- `frontend/src/components/Layout.jsx`: 240px fixed sidebar, Gauntlet brand, NavLink active state indigo-500
+- `frontend/src/components/StatusBadge.jsx`: pill with color by status (PENDING/DISPATCHED/RUNNING/DONE/FAILED); RUNNING animates-pulse
+- `frontend/src/components/ProgressBar.jsx`: current/total label + indigo fill bar
+- `frontend/src/components/ScoreBar.jsx`: green/amber/red by threshold (0.8/0.5), null → "N/A"
+- `frontend/src/components/ModelCompare.jsx`: sorted table (best first) with regression delta coloring
+- `frontend/src/pages/Suites.jsx`: list + inline create form with dynamic rubric criteria rows
+- `frontend/src/pages/Cases.jsx`: list + inline add form + delete with confirm; "Run this suite" to /runs/new?suite_id
+- `frontend/src/pages/NewRun.jsx`: suite select (pre-filled from query param), model checkboxes, score mode radio, baseline run ID, dispatch → /runs/{id}
+- `frontend/src/pages/Runs.jsx`: placeholder with New Run CTA (no list endpoint on backend yet)
+- `frontend/src/pages/RunStatus.jsx`: polls every 3s via setInterval; stops on DONE/FAILED; cleanup on unmount; pulsing dot indicator
+- `frontend/src/pages/Results.jsx`: 4 stat boxes + ModelCompare + full results table + regression section
+- `config/settings.py`: added `corsheaders` to SHARED_APPS; CorsMiddleware first in MIDDLEWARE; CORS_ALLOWED_ORIGINS from env; TEMPLATES DIRS includes `staticfiles/frontend`
+- `config/urls.py`: added `re_path(r'^(?!api/).*$', TemplateView)` catch-all for React Router
+- `docker-entrypoint.sh`: created -- frontend npm build → migrate → collectstatic → create_admin → exec
+- `Dockerfile`: added Node.js via apt-get; COPY frontend/; ENTRYPOINT docker-entrypoint.sh
+- `bin/dev.ps1`: added Step 4 -- Vite dev server window; updated URLs printed
+- `pyproject.toml`: added django-cors-headers>=4.3.0
+- Build verified: `npm run build` → `staticfiles/frontend/index.html` references `/static/frontend/assets/...` (correct for Whitenoise)
+- `manage.py check`: 0 issues; `collectstatic`: 127 files
+
+End-to-end test: backend was not running in CI environment; test manually with `bin/dev.ps1` then open http://localhost:5173 (dev) or http://localhost:8000 (production build).
+
+---
+
 ## Phase 4d -- Deployment config + portfolio docs -- 2026-06-08
 
 Phase 4d -- railway.toml; .railway.env.example; docs/deployment.md

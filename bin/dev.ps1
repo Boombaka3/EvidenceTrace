@@ -54,13 +54,25 @@ try {
     exit 1
 }
 
+# Step 4: Vite dev server in a new window
+Write-Host 'Starting Vite dev server...' -ForegroundColor Cyan
+try {
+    $q = "'"
+    $viteCmd = 'Set-Location ' + $q + $projectRoot + '\frontend' + $q + '; Write-Host ' + $q + 'Vite dev server' + $q + ' -ForegroundColor Cyan; npm run dev'
+    Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-Command', $viteCmd)
+    Write-Host '[OK] Vite window opened' -ForegroundColor Green
+} catch {
+    Write-Host ('[FAIL] Could not open Vite window: ' + $_) -ForegroundColor Red
+}
+
 Write-Host ''
 Write-Host '=== Dev environment ready ===' -ForegroundColor Green
 Write-Host ''
-Write-Host '  API:    http://localhost:8000/api/' -ForegroundColor White
-Write-Host '  Health: http://localhost:8000/api/health/' -ForegroundColor White
-Write-Host '  MinIO:  http://localhost:9001  (minioadmin / minioadmin)' -ForegroundColor White
-Write-Host '  Admin:  http://localhost:8000/admin/' -ForegroundColor White
+Write-Host '  Frontend: http://localhost:5173' -ForegroundColor White
+Write-Host '  API:      http://localhost:8000/api/' -ForegroundColor White
+Write-Host '  Health:   http://localhost:8000/api/health/' -ForegroundColor White
+Write-Host '  MinIO:    http://localhost:9001  (minioadmin / minioadmin)' -ForegroundColor White
+Write-Host '  Admin:    http://localhost:8000/admin/' -ForegroundColor White
 Write-Host ''
 Write-Host 'First-run checklist (if not done yet):' -ForegroundColor Yellow
 Write-Host '  1. uv run python manage.py migrate_schemas --shared' -ForegroundColor DarkGray
