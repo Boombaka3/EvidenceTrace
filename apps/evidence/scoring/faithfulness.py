@@ -3,7 +3,7 @@ import json
 import os
 import re
 
-import anthropic
+from apps.evidence.adapters.openai import OpenAICompatAdapter
 
 _VALID_ERROR_TYPES = {
     "overgeneralization",
@@ -78,14 +78,21 @@ def score_faithfulness(claim_text: str, source_sentence: str) -> dict:
     )
 
     try:
-        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=512,
-            temperature=0,
-            messages=[{"role": "user", "content": prompt}],
+        model = os.environ.get("NAVIGATOR_MODEL", "llama-3.3-70b-instruct")
+        adapter = OpenAICompatAdapter(model_id=model)
+        result = adapter.complete(
+            system_prompt="You are a scientific evidence auditor. Return only valid JSON.",
+            user_prompt=prompt,
+            max_tokens=256,
         )
-        raw = response.content[0].text.strip()
+        if result.error:
+            return {
+                "faithful": None,
+                "faithfulness_score": None,
+                "error_types": [],
+                "reasoning": "adapter error",
+            }
+        raw = result.output.strip()
         try:
             data = json.loads(_strip_fences(raw))
         except json.JSONDecodeError:

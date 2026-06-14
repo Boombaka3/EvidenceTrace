@@ -5,21 +5,41 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Linear design tokens — exact values from DESIGN.md
+        linear: {
+          canvas:              '#010102',
+          surface1:            '#0f1011',
+          surface2:            '#141516',
+          surface3:            '#18191a',
+          surface4:            '#191a1b',
+          hairline:            '#23252a',
+          'hairline-strong':   '#34343a',
+          'hairline-tertiary': '#3e3e44',
+          accent:              '#5e6ad2',
+          'accent-hover':      '#828fff',
+          'accent-focus':      '#5e69d1',
+          ink:                 '#f7f8f8',
+          'ink-muted':         '#d0d6e0',
+          'ink-subtle':        '#8a8f98',
+          'ink-tertiary':      '#62666d',
+          success:             '#27a644',
+        },
+        // gauntlet.* remapped to Linear values — existing classNames get Linear colors
         gauntlet: {
-          bg:      '#0A0A0F',
-          surface: '#111118',
-          border:  '#1E1E2E',
-          accent:  '#6366F1',
-          success: '#10B981',
+          bg:      '#010102',  // linear.canvas
+          surface: '#0f1011',  // linear.surface1
+          border:  '#23252a',  // linear.hairline
+          accent:  '#5e6ad2',  // linear.accent
+          success: '#27a644',  // linear.success
           warning: '#F59E0B',
           danger:  '#EF4444',
-          muted:   '#64748B',
-          text:    '#E2E8F0',
+          muted:   '#8a8f98',  // linear.ink-subtle
+          text:    '#f7f8f8',  // linear.ink
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['Inter', 'SF Pro Display', '-apple-system', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'monospace'],
       },
     },
   },

@@ -12,6 +12,9 @@ import time
 from pathlib import Path
 
 import httpx
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 BASE_URL = "http://localhost:8000"
 TENANT_HEADERS = {"Host": "demo.localhost"}
@@ -20,7 +23,8 @@ POLL_TIMEOUT = 180
 
 TEST_DATA = Path(__file__).parent / "test_data"
 API_KEY = os.environ.get("GAUNTLET_API_KEY", os.environ.get("DJANGO_SUPERUSER_API_KEY", ""))
-ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+NAVIGATOR_KEY = os.environ.get("OPENAI_API_KEY", "")
+NAVIGATOR_MODEL = os.environ.get("NAVIGATOR_MODEL", "llama-3.3-70b-instruct")
 
 
 def _headers() -> dict:
@@ -133,8 +137,8 @@ def main() -> None:
     print(f"    {r.json()}  OK")
 
     # ── Step 4: poll until DONE ───────────────────────────────────────────────
-    # If no API key, assert job at least reached RUNNING state
-    has_real_key = bool(ANTHROPIC_KEY) and ANTHROPIC_KEY not in ("sk-ant-...", "placeholder", "")
+    # If no NaviGator key, assert job at least reached RUNNING state
+    has_real_key = bool(NAVIGATOR_KEY) and NAVIGATOR_KEY not in ("<your-navigator-api-key>", "placeholder", "")
 
     step(4, f"Polling GET /api/evidence/jobs/{job_id}/  (up to {POLL_TIMEOUT}s)")
     elapsed = 0
@@ -178,7 +182,7 @@ def main() -> None:
 
     conflicts_data = r.json()
     if not conflicts_data:
-        print("    WARNING: no ConflictPairs found — check ANTHROPIC_API_KEY and Celery logs")
+        print("    WARNING: no ConflictPairs found — check OPENAI_API_KEY / NaviGator and Celery logs")
         print(f"\nSmoke test PASSED  (job DONE; 0 conflicts — may need larger PDFs)")
         return
 

@@ -16,11 +16,14 @@ export default function ScoreBar({ value, showLabel = true }) {
 
   return (
     <div className="min-w-[80px]">
-      <div className="w-full h-1.5 bg-gauntlet-border">
-        <div className={`h-1.5 ${fillColor}`} style={{ width: `${pct}%` }} />
+      <div className="w-full h-1 bg-gauntlet-border rounded-full overflow-hidden">
+        <div
+          className={`h-1 rounded-full transition-all duration-300 ${fillColor}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       {showLabel && (
-        <div className={`text-xs font-mono mt-0.5 ${labelColor}`}>
+        <div className={`text-xs font-mono mt-1 ${labelColor}`}>
           {value.toFixed(2)}
         </div>
       )}

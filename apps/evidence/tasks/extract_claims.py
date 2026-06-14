@@ -4,7 +4,6 @@ import logging
 import os
 from pathlib import Path
 
-import anthropic
 import boto3
 from celery import shared_task
 from django.conf import settings
@@ -40,7 +39,9 @@ def extract_claims(self, paper_id: int):
             paper.parsed_sections = sections
             paper.save(update_fields=["parsed_sections"])
 
-            client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+            from apps.evidence.adapters.openai import OpenAICompatAdapter
+            model = os.environ.get("NAVIGATOR_MODEL", "llama-3.3-70b-instruct")
+            adapter = OpenAICompatAdapter(model_id=model)
             claims_created = 0
 
             for section_name, section_text in sections.items():
@@ -48,12 +49,15 @@ def extract_claims(self, paper_id: int):
                     continue
                 prompt = EXTRACTOR_PROMPT.replace("{section_text}", section_text[:3000])
                 try:
-                    response = client.messages.create(
-                        model="claude-haiku-4-5-20251001",
+                    result = adapter.complete(
+                        system_prompt="You are a biomedical claim extractor. Return only valid JSON.",
+                        user_prompt=prompt,
                         max_tokens=1024,
-                        messages=[{"role": "user", "content": prompt}],
                     )
-                    raw = response.content[0].text.strip()
+                    if result.error:
+                        logger.error("Claim extraction failed for section %s: %s", section_name, result.error)
+                        continue
+                    raw = result.output.strip()
                     data = json.loads(raw)
                     for c in data.get("claims", []):
                         if not isinstance(c, dict) or not c.get("text"):

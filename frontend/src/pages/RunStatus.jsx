@@ -78,8 +78,8 @@ export default function RunStatus() {
     return (
       <div className="min-h-screen bg-gauntlet-bg px-8 py-8">
         <div className="animate-pulse space-y-4 max-w-2xl">
-          <div className="h-8 bg-gauntlet-surface border border-gauntlet-border" />
-          <div className="h-32 bg-gauntlet-surface border border-gauntlet-border" />
+          <div className="h-8 bg-gauntlet-surface rounded-lg border border-gauntlet-border" />
+          <div className="h-32 bg-gauntlet-surface rounded-xl border border-gauntlet-border" />
         </div>
       </div>
     )
@@ -94,14 +94,14 @@ export default function RunStatus() {
       {isMock && <MockBanner />}
       <div className="px-8 py-8">
         <div className="flex items-center gap-3 mb-8">
-          <h1 className="text-2xl font-semibold text-gauntlet-text">Run #{run.id}</h1>
+          <h1 className="text-xl font-semibold text-gauntlet-text tracking-tight">Run #{run.id}</h1>
           <StatusBadge status={run.status} size="lg" />
           {!TERMINAL.includes(run.status) && (
-            <span className="w-2 h-2 rounded-full bg-gauntlet-accent animate-pulse" title="Polling…" />
+            <span className="w-1.5 h-1.5 rounded-full bg-gauntlet-accent animate-pulse" title="Polling…" />
           )}
         </div>
 
-        <div className="bg-gauntlet-surface border border-gauntlet-border p-6 max-w-2xl space-y-5">
+        <div className="bg-gauntlet-surface border border-gauntlet-border rounded-xl p-6 max-w-2xl space-y-5">
           <ProgressBar current={run.progress} total={run.total} />
 
           <p className="text-sm text-gauntlet-text">{statusMessage(run)}</p>
@@ -132,18 +132,18 @@ export default function RunStatus() {
           </div>
         </div>
 
-        <div className="mt-6 flex gap-4">
+        <div className="mt-6 flex gap-3 items-center">
           {run.status === 'DONE' && (
             <button
               onClick={() => navigate(`/runs/${id}/results`)}
-              className="bg-gauntlet-success hover:bg-gauntlet-success/80 text-white text-sm font-medium px-5 py-2 transition-colors"
+              className="bg-gauntlet-accent hover:bg-[#828fff] text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
             >
               View Results →
             </button>
           )}
           <Link
             to="/suites"
-            className="text-gauntlet-muted hover:text-gauntlet-text text-sm"
+            className="text-gauntlet-muted hover:text-gauntlet-text text-sm transition-colors"
           >
             ← Back to Suites
           </Link>

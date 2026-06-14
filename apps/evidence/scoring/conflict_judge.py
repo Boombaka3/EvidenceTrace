@@ -4,8 +4,7 @@ import os
 import re
 from pathlib import Path
 
-import anthropic
-
+from apps.evidence.adapters.openai import OpenAICompatAdapter
 from apps.evidence.models import Claim, ConflictPair
 
 JUDGE_PROMPT = (Path(__file__).parent.parent / "prompts" / "conflict_judge.txt").read_text()
@@ -28,15 +27,17 @@ def _strip_fences(text: str) -> str:
     return re.sub(r"```(?:json)?|```", "", text).strip()
 
 
-def _call_claude(prompt: str) -> dict:
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=512,
-        temperature=0,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    raw = response.content[0].text.strip()
+def _get_adapter() -> OpenAICompatAdapter:
+    model = os.environ.get("NAVIGATOR_MODEL", "llama-3.3-70b-instruct")
+    return OpenAICompatAdapter(model_id=model)
+
+
+def _call_judge(prompt: str) -> dict:
+    adapter = _get_adapter()
+    result = adapter.complete(system_prompt="You are a scientific conflict detection expert. Return only valid JSON.", user_prompt=prompt, max_tokens=512)
+    if result.error:
+        return {}
+    raw = result.output.strip()
     try:
         return json.loads(_strip_fences(raw))
     except json.JSONDecodeError:
@@ -87,7 +88,7 @@ def judge_conflict(claim_a: Claim, claim_b: Claim) -> ConflictPair:
     )
 
     try:
-        data = _call_claude(prompt)
+        data = _call_judge(prompt)
     except Exception:
         data = {}
 
@@ -126,7 +127,7 @@ def judge_conflict_text(
     )
 
     try:
-        data = _call_claude(prompt)
+        data = _call_judge(prompt)
     except Exception:
         data = {}
 

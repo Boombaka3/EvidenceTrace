@@ -17,7 +17,7 @@ Usage:
   uv run python scripts/benchmark.py --dataset scifact
   uv run python scripts/benchmark.py --out scripts/test_data/benchmark_results.jsonl
 
-Requires ANTHROPIC_API_KEY in .env.
+Requires OPENAI_API_KEY (NaviGator Toolkit) in .env.
 Exit 0 on completion (regardless of score), 1 on setup failure.
 """
 import argparse
@@ -269,9 +269,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key or api_key in ("sk-ant-...", "placeholder", ""):
-        print("ERROR: ANTHROPIC_API_KEY not set in .env — benchmark requires Claude API.")
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key or api_key in ("<your-navigator-api-key>", "placeholder", ""):
+        print("ERROR: OPENAI_API_KEY not set in .env — benchmark requires NaviGator Toolkit API key.")
+        print("  Set OPENAI_COMPAT_BASE_URL=https://api.ai.it.ufl.edu/v1 and your NaviGator key.")
         sys.exit(1)
 
     print("Loading benchmark records...")

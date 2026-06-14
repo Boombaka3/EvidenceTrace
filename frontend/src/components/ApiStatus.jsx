@@ -21,7 +21,7 @@ export function ApiStatus() {
     <div className="fixed bottom-0 left-0 right-0 h-6
                     bg-gauntlet-surface border-t border-gauntlet-border
                     flex items-center px-4 gap-2 z-50">
-      <span className={`w-1.5 h-1.5 rounded-full ${
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
         online ? 'bg-gauntlet-success' : 'bg-gauntlet-danger animate-pulse'
       }`} />
       <span className="text-gauntlet-muted text-xs font-mono">

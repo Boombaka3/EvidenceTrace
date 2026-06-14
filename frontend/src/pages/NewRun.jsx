@@ -70,7 +70,7 @@ export default function NewRun() {
       {isMock && <MockBanner />}
       <div className="px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gauntlet-text">New Run</h1>
+          <h1 className="text-xl font-semibold text-gauntlet-text tracking-tight">New Run</h1>
           <p className="text-gauntlet-muted text-sm mt-1">Configure and dispatch an evaluation run</p>
         </div>
 
@@ -78,7 +78,7 @@ export default function NewRun() {
         {error && <ErrorState message={error} />}
 
         {!loading && !error && suites && models && (
-          <form onSubmit={handleSubmit} className="max-w-2xl space-y-8">
+          <form onSubmit={handleSubmit} className="max-w-2xl space-y-7">
             {/* Suite */}
             <div>
               <label className="block text-gauntlet-muted text-xs font-mono uppercase tracking-wider mb-2">
@@ -87,7 +87,7 @@ export default function NewRun() {
               <select
                 value={suiteId}
                 onChange={e => setSuiteId(e.target.value)}
-                className="w-full bg-gauntlet-surface border border-gauntlet-border text-gauntlet-text text-sm px-3 py-2 focus:outline-none focus:border-gauntlet-accent"
+                className="w-full bg-gauntlet-surface border border-gauntlet-border text-gauntlet-text text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-gauntlet-accent focus:ring-1 focus:ring-gauntlet-accent/30 transition-colors"
               >
                 <option value="">-- Select a suite --</option>
                 {suites.map(s => (
@@ -99,13 +99,13 @@ export default function NewRun() {
             {/* Models */}
             <div>
               <label className="block text-gauntlet-muted text-xs font-mono uppercase tracking-wider mb-2">
-                Models <span className="normal-case">— select one or more</span>
+                Models <span className="normal-case font-normal">— select one or more</span>
               </label>
-              <div className="border border-gauntlet-border divide-y divide-gauntlet-border max-h-64 overflow-y-auto">
+              <div className="rounded-xl border border-gauntlet-border overflow-hidden divide-y divide-gauntlet-border max-h-64 overflow-y-auto">
                 {models.map(m => (
                   <label
                     key={m}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-gauntlet-surface cursor-pointer"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-gauntlet-surface cursor-pointer transition-colors"
                   >
                     <input
                       type="checkbox"
@@ -124,19 +124,19 @@ export default function NewRun() {
               <label className="block text-gauntlet-muted text-xs font-mono uppercase tracking-wider mb-2">
                 Score Mode
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 {SCORE_MODES.map(({ value, label, desc }) => (
                   <div
                     key={value}
                     onClick={() => setScoreMode(value)}
-                    className={`cursor-pointer border p-4 transition-colors ${
+                    className={`cursor-pointer border rounded-xl p-4 transition-colors ${
                       scoreMode === value
                         ? 'border-gauntlet-accent bg-gauntlet-accent/5'
-                        : 'border-gauntlet-border bg-gauntlet-surface hover:border-gauntlet-muted'
+                        : 'border-gauntlet-border bg-gauntlet-surface hover:border-[#34343a]'
                     }`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 transition-colors ${
                         scoreMode === value
                           ? 'border-gauntlet-accent bg-gauntlet-accent'
                           : 'border-gauntlet-muted'
@@ -160,13 +160,13 @@ export default function NewRun() {
                   value={baselineRunId}
                   onChange={e => setBaselineRunId(e.target.value)}
                   placeholder="Enter baseline EvalRun ID"
-                  className="w-full bg-gauntlet-surface border border-gauntlet-border text-gauntlet-text text-sm px-3 py-2 focus:outline-none focus:border-gauntlet-accent font-mono"
+                  className="w-full bg-gauntlet-surface border border-gauntlet-border text-gauntlet-text text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-gauntlet-accent focus:ring-1 focus:ring-gauntlet-accent/30 font-mono transition-colors"
                 />
               </div>
             )}
 
             {submitError && (
-              <div className="border border-gauntlet-danger/30 bg-gauntlet-danger/10 text-gauntlet-danger text-sm px-4 py-3 font-mono">
+              <div className="rounded-lg border border-gauntlet-danger/20 bg-gauntlet-danger/10 text-gauntlet-danger text-sm px-4 py-3 font-mono">
                 {submitError}
               </div>
             )}
@@ -174,7 +174,7 @@ export default function NewRun() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-gauntlet-accent hover:bg-gauntlet-accent/80 disabled:opacity-50 text-white text-sm font-medium py-3 transition-colors"
+              className="w-full bg-gauntlet-accent hover:bg-[#828fff] disabled:opacity-40 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
             >
               {submitting ? 'Dispatching...' : 'Dispatch Run'}
             </button>

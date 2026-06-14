@@ -2,8 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #0A0A0F;
-  color: #E2E8F0;
-  font-family: 'Inter', system-ui, sans-serif;
+:root {
+  --linear-canvas:            #010102;
+  --linear-surface-1:         #0f1011;
+  --linear-surface-2:         #141516;
+  --linear-surface-3:         #18191a;
+  --linear-hairline:          #23252a;
+  --linear-hairline-strong:   #34343a;
+  --linear-hairline-tertiary: #3e3e44;
+  --linear-accent:            #5e6ad2;
+  --linear-accent-hover:      #828fff;
+  --linear-accent-focus:      #5e69d1;
+  --linear-ink:               #f7f8f8;
+  --linear-ink-muted:         #d0d6e0;
+  --linear-ink-subtle:        #8a8f98;
+  --linear-ink-tertiary:      #62666d;
+  --linear-success:           #27a644;
 }
+
+body {
+  background-color: var(--linear-canvas);
+  color: var(--linear-ink);
+  font-family: 'Inter', 'SF Pro Display', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: -0.003em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Linear-style scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--linear-canvas); }
+::-webkit-scrollbar-thumb { background: var(--linear-hairline-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--linear-hairline-tertiary); }
+
+/* Selection highlight in accent color */
+::selection { background-color: rgba(94, 106, 210, 0.25); color: var(--linear-ink); }
