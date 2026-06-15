@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 import boto3
@@ -58,6 +59,9 @@ def extract_claims(self, paper_id: int):
                         logger.error("Claim extraction failed for section %s: %s", section_name, result.error)
                         continue
                     raw = result.output.strip()
+                    raw = re.sub(r'^```(?:json)?\s*', '', raw, flags=re.MULTILINE)
+                    raw = re.sub(r'```\s*$', '', raw, flags=re.MULTILINE)
+                    raw = raw.strip()
                     data = json.loads(raw)
                     for c in data.get("claims", []):
                         if not isinstance(c, dict) or not c.get("text"):

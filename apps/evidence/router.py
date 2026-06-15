@@ -72,15 +72,22 @@ def _paper_out(paper: Paper) -> PaperOut:
 
 def _conflict_out(cp: ConflictPair) -> ConflictPairOut:
     reward = None
-    if hasattr(cp, "reward"):
-        r = cp.reward
-        reward = RewardScoreOut(
-            consistency_score=r.consistency_score,
-            nli_score=r.nli_score,
-            faithfulness_score=r.faithfulness_score,
-            final_confidence=r.final_confidence,
-            n_samples=r.n_samples,
-        )
+    consistency_score = None
+    final_confidence = None
+    r_obj = getattr(cp, "reward", None)
+    if r_obj is not None:
+        try:
+            reward = RewardScoreOut(
+                consistency_score=r_obj.consistency_score,
+                nli_score=r_obj.nli_score,
+                faithfulness_score=r_obj.faithfulness_score,
+                final_confidence=r_obj.final_confidence,
+                n_samples=r_obj.n_samples,
+            )
+            consistency_score = r_obj.consistency_score
+            final_confidence = r_obj.final_confidence
+        except Exception:
+            pass
     return ConflictPairOut(
         id=cp.id,
         claim_a_id=cp.claim_a_id,
@@ -91,6 +98,9 @@ def _conflict_out(cp: ConflictPair) -> ConflictPairOut:
         reasoning=cp.reasoning,
         source_sentence_a=cp.source_sentence_a,
         source_sentence_b=cp.source_sentence_b,
+        error_types=list(cp.error_types) if cp.error_types else [],
+        consistency_score=consistency_score,
+        final_confidence=final_confidence,
         reward=reward,
         created_at=cp.created_at,
     )

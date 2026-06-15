@@ -58,7 +58,8 @@ def main() -> None:
     if all_passed:
         print("All steps passed.")
         print(r"First run complete. Start dev servers with: .\bin\dev.ps1")
-        print("Add your ANTHROPIC_API_KEY to .env to enable LLM judge scoring.")
+        print("Add your NaviGator API key as OPENAI_API_KEY in .env to enable LLM judge scoring.")
+        print("Get key at: https://api.ai.it.ufl.edu/ui")
         print("Run smoke test with: uv run python scripts/smoke_test.py")
         sys.exit(0)
     else:

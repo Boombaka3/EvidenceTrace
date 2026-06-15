@@ -71,6 +71,9 @@ class ConflictPairOut(Schema):
     reasoning: str
     source_sentence_a: str
     source_sentence_b: str
+    error_types: list[str] = []
+    consistency_score: float | None = None
+    final_confidence: float | None = None
     reward: RewardScoreOut | None
     created_at: datetime
 

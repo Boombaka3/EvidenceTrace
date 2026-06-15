@@ -62,9 +62,14 @@ print(f"  {result.output[:300]}")
 print()
 
 try:
-    data = json.loads(result.output.strip())
+    import re
+    raw = result.output.strip()
+    raw = re.sub(r'^```(?:json)?\s*', '', raw, flags=re.MULTILINE)
+    raw = re.sub(r'```\s*$', '', raw, flags=re.MULTILINE)
+    raw = raw.strip()
+    data = json.loads(raw)
     verdict = data.get("verdict", "")
-    if verdict not in ("SUPPORTS", "CONTRADICTS", "NEI"):
+    if verdict not in ("SUPPORTS", "CONTRADICTS", "PARTIAL", "NEI"):
         print(f"FAIL: unexpected verdict value '{verdict}'")
         sys.exit(1)
     print(f"PASS  verdict={verdict}  latency={result.latency_ms}ms")

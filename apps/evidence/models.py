@@ -85,6 +85,7 @@ class ConflictPair(models.Model):
     source_sentence_b = models.TextField(blank=True)
     error_types       = models.JSONField(
         default=list,
+        blank=True,
         help_text=(
             "EvidenceLens error taxonomy: "
             "overgeneralization, condition_dropping, false_certainty, "

@@ -1,96 +1,179 @@
-# Interview Prep — LLM Eval Harness
+# EvidenceTrace -- Interview and Application Prep
+
+## Project in one sentence
+
+Multi-tenant NLP backend that extracts structured claims from biomedical research PDFs,
+builds a cross-paper conflict graph, and detects contradictions using an RL-refined
+reward model (consistency voting + faithfulness scoring).
 
 ---
 
-## Multi-tenancy
+## Backend interview anchors
 
-We use `django-tenants` with a schema-per-tenant strategy on PostgreSQL. Every customer team gets a dedicated PostgreSQL schema (e.g., `acme`, `demo`) that contains their own copies of the `evals_*` tables. The PUBLIC schema holds only cross-cutting concerns: `Tenant`, `Domain`, and `User`. The Django ORM routes queries automatically — after the request middleware resolves the hostname to a `Tenant` row and calls `set_schema()`, every subsequent ORM query targets that tenant's schema. This means there is no application-level `WHERE tenant_id = ?` filtering; isolation is enforced by the database itself.
+### Q: Walk me through POST /api/evidence/jobs/{id}/dispatch/
+
+A: The endpoint marks the job RUNNING and calls dispatch_analysis_job.delay(job_id).
+   In the Celery task:
+   1. A group of extract_claims.si(paper_id) tasks fires -- one per uploaded PDF.
+   2. A chord callback (build_conflict_graph) fires when ALL extraction tasks complete.
+   extract_claims calls llama-3.3-70b-instruct via NaviGator Toolkit (UF HiPerGator),
+   parses structured claim JSON per section, stores Claim objects in PostgreSQL.
+   build_conflict_graph generates all cross-paper claim pairs (O(n x m)),
+   runs judge_conflict N times per pair (RL consistency voting),
+   stores ConflictPair + RewardScore, marks job DONE.
+
+### Q: How does multi-tenancy work at the database level?
+
+A: django-tenants creates a separate PostgreSQL schema per tenant.
+   The demo tenant's tables (evidence_analysisjob, evidence_paper, etc.)
+   live in the demo schema, isolated from other tenants.
+   The middleware reads the Host header on every request,
+   looks up the tenant in the public.core_tenant table,
+   and executes SET search_path = demo before any query.
+   No row-level tenant_id filtering -- true schema isolation.
+   Cross-tenant data access is impossible at the database level.
+
+### Q: What is the RL component?
+
+A: Level 1 RL: run the conflict judge N times on the same claim pair.
+   Majority verdict wins. consistency_score = majority_count / N.
+   A second LLM call audits claim faithfulness against the source sentence.
+   faithfulness_score = how well the claim is grounded in the original text.
+   final_confidence = 0.7 * consistency + 0.3 * faithfulness.
+   This addresses the self-verification problem in LLM-as-judge:
+   a single verdict has unknown reliability; N samples give a distribution.
+
+### Q: How do you handle a model API failure mid-pipeline?
+
+A: extract_claims and build_graph tasks catch all exceptions at the per-item level.
+   A failed section extraction is logged and skipped; the task continues.
+   A failed conflict pair judgment falls back to NEI verdict.
+   Celery chord still fires build_conflict_graph after all extract_claims tasks complete,
+   even if individual tasks had partial failures.
+   AnalysisJob.status reflects the terminal state (DONE or FAILED).
+
+### Q: Why NaviGator Toolkit?
+
+A: NaviGator Toolkit is UF's OpenAI-compatible API running on HiPerGator.
+   The OpenAICompatAdapter handles any OpenAI-compatible endpoint.
+   Switching models is a one-line change: NAVIGATOR_MODEL=medgemma-27b-it.
+   For biomedical domain tasks, medgemma-27b-it is locally available at zero cost.
+   The adapter pattern makes the backend model-agnostic.
+
+### Q: What does the Celery chord pattern buy you?
+
+A: The chord pattern (group + callback) decouples extraction from graph building.
+   All N extract_claims tasks run in parallel -- one per paper.
+   build_conflict_graph fires exactly once, after all extractions complete.
+   If one paper fails extraction, the chord still fires with partial claims.
+   This is a proper fan-out/join pattern -- not polling or sleep loops.
+
+### Q: How is the API authenticated?
+
+A: Every protected endpoint requires X-API-Key in the request header.
+   ApiKeyAuth (Django Ninja) looks up the key in the users.User table (public schema).
+   Keys are auto-generated via secrets.token_urlsafe(32) on User.save().
+   The demo admin key is printed by scripts/create_admin.py after first run.
 
 ---
 
-## Fan-out pattern
+## PhD application anchors
 
-When a new `EvalRun` is created via the API, `dispatch_eval_run` is called as a Celery task. It iterates every `PromptCase` in the suite and every `model_id` in the run, creates a `ModelRun` row for each combination (N cases × M models), then builds a Celery `group` of `run_model.si(model_run_id)` signatures — one per `ModelRun`. The group is wrapped in a `chord`: all `run_model` tasks execute in parallel, and only after every task in the group has completed (success or failure) does the chord callback, `score_all_results.si(eval_run_id)`, fire. This guarantees we have a complete picture of all model outputs before scoring begins.
+### Research contribution
 
----
+EvidenceLens established baseline: 24.5% error rate, 5/5 conflict pairs detected.
+EvidenceTrace extends it with:
+1. Production-grade backend (Django 5, Celery, multi-tenant PostgreSQL)
+2. RL reward scoring (N-sample consistency + faithfulness blend)
+3. 10-type error taxonomy from EvidenceLens applied per claim
+4. 4,960-record benchmark across SciFact, PubMedQA, QASPER
 
-## Partial failure
+### Open problem addressed
 
-`run_model` is designed to never raise. It wraps the adapter call and the S3 upload in a broad `try/except`, and in the except block it writes the error message to `ModelRun.error_message` and sets `ModelRun.status = FAILED` before returning. Because Celery `group` tracks completion by task termination rather than success, a failed `run_model` task still counts as "done" for the chord, so `score_all_results` fires regardless. The scoring task then simply skips `ModelRun` rows whose status is `FAILED`, writing `ScoreResult` only for successful outputs. The final report includes both succeeded and failed runs so the caller can see the partial results.
+Cross-paper claim conflict detection at scale.
+LLM-as-judge has no independent verification layer.
+Single verdicts have unknown reliability.
+Consistency voting + faithfulness scoring provides calibrated confidence.
 
----
+### Publishable roadmap
 
-## LLM-as-judge
-
-For `rubric` and `llm_judge` score modes, we call the Claude API with a structured prompt loaded at runtime from `apps/evals/prompts/judge_score.txt`. The prompt injects the original system prompt, user prompt, model output, and the suite's rubric criteria list. Claude is instructed to return a JSON object of the form `{criterion: score (1–5), reasoning: str}`. We parse that JSON, compute a weighted average using the criterion weights stored in `EvalSuite.rubric`, and store the result in `ScoreResult.scores` (per-criterion) and `ScoreResult.overall` (weighted float). The raw reasoning string is preserved in `ScoreResult.judge_reasoning` for auditability.
-
----
-
-## Regression tracking
-
-Any `EvalRun` can be pinned as a baseline by calling `POST /runs/{id}/pin-baseline/`, which writes the run's `id` to `EvalSuite.baseline_run_id`. When a new run is created with `score_mode=regression`, `score_all_results` looks up the `ScoreResult` for the same (`PromptCase`, `model_id`) pair from the baseline run and computes `regression_delta = current.overall - baseline.overall`. A negative delta means the model got worse. The run is marked `passed = False` if `regression_delta < -threshold`, where `threshold` defaults to `0.3` but is configurable per `EvalSuite`. This value and the delta are stored on `ScoreResult` so you can sort, filter, and alert on regressions from the API or a dashboard.
-
----
-
-## S3 / presigned URL pattern
-
-Raw model outputs and final JSON reports are stored in MinIO (S3-compatible) rather than in the database. After `run_model` receives a response, it uploads the raw text to `s3://{bucket}/{eval_run_id}/{model_run_id}.txt` using a standard `put_object` call and stores the resulting key in `ModelRun.s3_key`. If a client needs to download the raw output, the API generates a presigned URL via `boto3.generate_presigned_url` and returns only that URL — the server never reads the bytes back and proxies them. This keeps database rows small and means large outputs (code, long documents) do not impact API response times.
+Level 2: DeBERTa NLI reward model fine-tuned on SciFact + FEVER-NLI
+  -- acts as a verifiable secondary signal independent of the judge LLM
+Level 3: RLVR fine-tuning on SciFact ground truth
+  -- directly relevant to AVeriTeC 2025, SciClaimEval, CONFACT benchmarks
 
 ---
 
-## Model adapter pattern
-
-All four provider adapters (`AnthropicAdapter`, `OpenAIAdapter`, `GeminiAdapter`, `OpenAICompatAdapter`) implement the same `ModelAdapter` abstract base class with a single `complete(system_prompt, user_prompt, max_tokens, timeout) -> AdapterResult` method. The factory classmethod `ModelAdapter.from_model_id(model_id)` routes by prefix: `claude-*` → Anthropic, `gpt-*` / `o1*` → OpenAI, `gemini-*` → Gemini, anything else → the OpenAI-compatible adapter pointed at `OPENAI_COMPAT_BASE_URL` (Ollama, vLLM, etc.). Adding a new provider means creating one new file in `adapters/` and adding a new prefix branch in the factory — zero changes elsewhere in the codebase.
-
----
-
-## Django Ninja vs DRF
-
-Django REST Framework relies on class-based `Serializer` and `ViewSet` abstractions that duplicate model declarations and require manual wiring. Django Ninja is Pydantic-native: request bodies and responses are typed with Pydantic models defined in `schemas.py`, validated automatically, and serialized to JSON without any serializer class. It also generates an OpenAPI schema for free. For this project the schemas are co-located with the router in `apps/evals/`, making it easy to see the contract for every endpoint in one place. Ninja also supports `async def` view functions natively, which matters when we want to add async scoring paths without switching frameworks.
-
----
-
-## Live demo script
-
-Step-by-step walkthrough for an interview setting.
-
-**1. Open http://localhost:8000/api/docs**
-
-Say: "This is the Swagger UI auto-generated by Django Ninja from the API schemas. Every request and response type is defined in `apps/evals/schemas.py` using Pydantic — no separate serializer classes."
-
-**2. POST /api/evals/suites/ -- fill in name, version, rubric criteria**
-
-Say: "Each tenant has isolated data -- this suite is only visible in the demo schema. The middleware resolves the `Host` header to a tenant row and sets the PostgreSQL schema before any ORM query runs."
-
-**3. POST /api/evals/suites/{id}/cases/ -- add two prompt cases with expected outputs**
-
-Say: "Each case is a (system_prompt, user_prompt, expected_output) triple. You can tag cases for filtering. The suite's rubric criteria and weights live on the suite, not the case."
-
-**4. POST /api/evals/runs/ -- select two models, set score_mode=exact_match**
-
-Say: "Dispatching creates N x M Celery tasks -- one per prompt-case/model pair -- all running in parallel via group + chord. With 2 cases and 2 models that's 4 parallel tasks. The chord callback only fires after all 4 complete, whether they succeed or fail."
-
-**5. Poll GET /api/evals/runs/{id}/ -- show PENDING -> RUNNING -> DONE live**
-
-Say: "The chord callback fires score_all_results only after every model task completes -- including failed ones, which are scored with empty output. Progress is tracked by counting DONE + FAILED ModelRun rows against total."
-
-**6. GET /api/evals/runs/{id}/results/ -- show scored outputs table**
-
-Say: "ScoreResults store per-criterion rubric scores, overall, passed, and regression_delta against any pinned baseline run. For exact_match, overall is a difflib ratio and passed is true when it exceeds 0.95."
-
-**7. Draw the ASCII pipeline on a whiteboard from memory**
+## API endpoints for live demo
 
 ```
-POST /api/evals/runs/
-  -> EvalRun created
-  -> Celery group: N x M run_model tasks (parallel)
-      -> Claude / GPT-4o / Gemini adapters
-      -> raw output stored to S3 + DB
-  -> chord: score_all_results when all done
-      -> exact_match / rubric / llm_judge / regression scoring
-      -> ScoreResult written per ModelRun
-      -> report JSON uploaded to S3
-      -> EvalRun marked DONE
+POST /api/evidence/jobs/                   Create job (n_samples=3)
+POST /api/evidence/jobs/{id}/papers/       Upload PDF (multipart/form-data)
+POST /api/evidence/jobs/{id}/dispatch/     Start pipeline (Celery chord)
+GET  /api/evidence/jobs/{id}/              Poll: claims_count grows, then conflicts_count
+GET  /api/evidence/jobs/{id}/conflicts/    Conflict pairs with RL confidence scores
+GET  /api/evidence/jobs/{id}/report/       Summary: contradictions, avg confidence
 ```
 
-Say: "The fan-out is the interesting distributed systems problem -- 30 tasks in parallel, one chord callback, partial failure handled at the task level. The chord only fires once; if the broker restarts mid-run, ScoreResult uses `ignore_conflicts=True` on bulk_create so re-scoring is idempotent."
+Swagger UI: http://localhost:8000/api/docs
+
+---
+
+## What to say about each conflict field
+
+```
+verdict:           CONTRADICTS/SUPPORTS/PARTIAL/NEI -- LLM majority vote
+conflict_type:     direct/methodological/temporal/population/none
+severity:          1-5 scale of disagreement magnitude
+consistency_score: RL signal -- agreement across N independent judgments
+faithfulness_score: claim is grounded in source sentence (0.0 to 1.0)
+final_confidence:  0.7 * consistency + 0.3 * faithfulness
+error_types:       EvidenceLens taxonomy applied per claim pair
+```
+
+Error types: overgeneralization, condition_dropping, false_certainty,
+missing_evidence, unsupported_claim, wrong_evidence,
+missing_limitation, contradiction_with_source,
+conflict_ignored, paper_section_misread
+
+---
+
+## ASCII pipeline to draw on whiteboard
+
+```
+POST /api/evidence/jobs/{id}/dispatch/
+  --> AnalysisJob.status = RUNNING
+  --> dispatch_analysis_job.delay(job_id)      [Celery task]
+      --> group([
+            extract_claims.si(paper_1_id),
+            extract_claims.si(paper_2_id),
+            ...
+          ])
+          each extract_claims:
+            - download PDF from MinIO
+            - parse sections (pdfplumber)
+            - LLM --> JSON claims per section
+            - store Claim objects in PostgreSQL
+      --> chord callback fires when all done:
+          build_conflict_graph.si(job_id)
+            - for each paper pair: O(n x m) claim pairs
+            - compute_reward(claim_a, claim_b, n_samples=3):
+                - judge_conflict x 3 (LLM-as-judge)
+                - majority vote --> consistency_score
+                - score_faithfulness x 2 (one per claim)
+                - final_confidence = 0.7*consistency + 0.3*faithfulness
+            - store ConflictPair + RewardScore
+  --> AnalysisJob.status = DONE
+```
+
+---
+
+## Key numbers for interviews
+
+- 4,960 benchmark records (SciFact + PubMedQA + QASPER)
+- 5 hand-curated cross-document conflict pairs (ground truth)
+- 10-type error taxonomy (EvidenceLens)
+- 24.5% baseline error rate (EvidenceLens 200-record study)
+- 38 pytest tests (models, API, scoring, RL pipeline)
+- Level 1 RL: majority vote over N samples, n=1/3/5 configurable
+- final_confidence formula: 0.7 * consistency + 0.3 * faithfulness
