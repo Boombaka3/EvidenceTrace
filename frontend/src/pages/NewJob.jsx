@@ -4,9 +4,9 @@ import { useNavigate } from 'react-router-dom'
 import { createJob } from '../api/client.js'
 
 const SAMPLE_OPTIONS = [
-  { value: 1, label: 'Quick',    desc: '1 run per claim pair' },
-  { value: 3, label: 'Balanced', desc: '3 runs — recommended' },
-  { value: 5, label: 'Thorough', desc: '5 runs — highest confidence' },
+  { value: 1, label: 'Quick',    desc: '1 judgment per claim pair' },
+  { value: 3, label: 'Balanced', desc: '3 judgments — recommended' },
+  { value: 5, label: 'Thorough', desc: '5 judgments — highest confidence' },
 ]
 
 export default function NewJob() {

@@ -130,10 +130,12 @@ export default function Conflicts() {
 
         {/* Summary stat row */}
         {conflicts && conflicts.length > 0 && (
-          <p className="text-[#d0d6e0] text-sm font-mono border-b border-[#23252a] pb-3 mb-4">
-            {conflicts.length} pair{conflicts.length !== 1 ? 's' : ''} analyzed —{' '}
-            {contradictions} contradiction{contradictions !== 1 ? 's' : ''},{' '}
-            {supports} agreement{supports !== 1 ? 's' : ''}
+          <p className="text-[#8a8f98] text-xs font-mono border-b border-[#23252a] pb-3 mb-4">
+            {conflicts.length} claim pair{conflicts.length !== 1 ? 's' : ''} analyzed
+            &nbsp;&middot;&nbsp;
+            <span className="text-[#EF4444]">{contradictions} contradiction{contradictions !== 1 ? 's' : ''}</span>
+            &nbsp;&middot;&nbsp;
+            <span className="text-[#27a644]">{supports} agreement{supports !== 1 ? 's' : ''}</span>
           </p>
         )}
 

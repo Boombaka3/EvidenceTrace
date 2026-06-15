@@ -28,10 +28,28 @@ def test_health_check():
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
 
-def test_unauthed_returns_401():
+def test_list_jobs_public():
+    """GET /jobs/ requires no auth — public read endpoint."""
     c = Client(HTTP_HOST="demo.localhost")
-    res = c.get("/api/evidence/jobs/999/")
+    res = c.get("/api/evidence/jobs/")
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)
+
+
+def test_create_job_requires_auth():
+    """POST /jobs/ without key returns 401."""
+    c = Client(HTTP_HOST="demo.localhost")
+    res = _post_json(c, "/api/evidence/jobs/", {"n_samples": 1})
     assert res.status_code == 401
+
+
+def test_get_job_public(job):
+    """GET /jobs/{id}/ requires no auth."""
+    with schema_context("demo"):
+        c = Client(HTTP_HOST="demo.localhost")
+        res = c.get(f"/api/evidence/jobs/{job.id}/")
+        assert res.status_code == 200
+        assert res.json()["id"] == job.id
 
 
 # ── Jobs ───────────────────────────────────────────────────────────────────────

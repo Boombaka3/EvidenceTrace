@@ -108,13 +108,19 @@ def _conflict_out(cp: ConflictPair) -> ConflictPairOut:
 
 # ── Jobs ──────────────────────────────────────────────────────────────────────
 
+@router.get("/jobs/", response=list[JobOut])
+def list_jobs(request):
+    jobs = AnalysisJob.objects.order_by("-created_at")
+    return [_job_out(j) for j in jobs]
+
+
 @router.post("/jobs/", response=JobOut, auth=api_key_auth)
 def create_job(request, data: JobIn):
     job = AnalysisJob.objects.create(n_samples=max(1, data.n_samples))
     return _job_out(job)
 
 
-@router.get("/jobs/{job_id}/", response=JobOut, auth=api_key_auth)
+@router.get("/jobs/{job_id}/", response=JobOut)
 def get_job(request, job_id: int):
     job = _get_or_404(AnalysisJob, job_id)
     return _job_out(job)
@@ -144,7 +150,7 @@ def upload_paper(request, job_id: int, pdf_file: UploadedFile = File(...), title
     return _paper_out(paper)
 
 
-@router.get("/jobs/{job_id}/papers/", response=list[PaperOut], auth=api_key_auth)
+@router.get("/jobs/{job_id}/papers/", response=list[PaperOut])
 def list_papers(request, job_id: int):
     job = _get_or_404(AnalysisJob, job_id)
     return [_paper_out(p) for p in job.papers.all()]
@@ -176,7 +182,7 @@ def dispatch_job(request, job_id: int):
 
 # ── Claims & Conflicts ────────────────────────────────────────────────────────
 
-@router.get("/jobs/{job_id}/claims/", response=list[ClaimOut], auth=api_key_auth)
+@router.get("/jobs/{job_id}/claims/", response=list[ClaimOut])
 def list_claims(request, job_id: int):
     _get_or_404(AnalysisJob, job_id)
     claims = Claim.objects.filter(paper__job_id=job_id).select_related("paper").order_by("created_at")
@@ -196,7 +202,7 @@ def list_claims(request, job_id: int):
     ]
 
 
-@router.get("/jobs/{job_id}/conflicts/", response=list[ConflictPairOut], auth=api_key_auth)
+@router.get("/jobs/{job_id}/conflicts/", response=list[ConflictPairOut])
 def list_conflicts(request, job_id: int):
     _get_or_404(AnalysisJob, job_id)
     conflicts = (
@@ -208,7 +214,7 @@ def list_conflicts(request, job_id: int):
     return [_conflict_out(cp) for cp in conflicts]
 
 
-@router.get("/jobs/{job_id}/report/", response=ReportOut, auth=api_key_auth)
+@router.get("/jobs/{job_id}/report/", response=ReportOut)
 def get_report(request, job_id: int):
     job = _get_or_404(AnalysisJob, job_id)
     papers = list(job.papers.all())
