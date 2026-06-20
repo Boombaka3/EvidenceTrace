@@ -1,21 +1,24 @@
 # scripts/benchmark.py
 """
-Offline benchmark for EvidenceTrace conflict detection.
+Offline benchmark for EvidenceTrace evidence QA scoring.
 
-Evaluates judge_conflict_text() against two ground-truth datasets:
-  - scripts/test_data/benchmark_records.jsonl  (15 SciFact/PubMedQA/QASPER records)
-  - scripts/test_data/conflict_pairs_ground_truth.jsonl  (5 manual cross-document pairs)
+Evaluates compute_reward_text() against ground-truth datasets:
+  - scripts/test_data/benchmark_records.jsonl  (SciFact/PubMedQA/QASPER records)
+  - scripts/test_data/conflict_pairs_ground_truth.jsonl  (5 manual cross-doc pairs)
 
-Metrics reported:
-  - Verdict accuracy (overall + per source_dataset)
-  - Verdict confusion matrix
-  - Error-type Jaccard overlap (predicted vs target_error_types)
+Reward components reported:
+  - Outcome reward (binary, from gold label)
+  - NLI grounding score (cross-encoder/nli-deberta-v3-base)
+  - Consistency score (N-sample voting)
+  - Format score (1.0 if <think>/<answer> tags used)
+  - Final confidence (weighted composite)
+  - Overall QA accuracy (predicted answer vs gold)
 
 Usage:
   uv run python scripts/benchmark.py
-  uv run python scripts/benchmark.py --limit 5
+  uv run python scripts/benchmark.py --limit 50
   uv run python scripts/benchmark.py --dataset scifact
-  uv run python scripts/benchmark.py --out scripts/test_data/benchmark_results.jsonl
+  uv run python scripts/benchmark.py --out docs/benchmark_results_v2.jsonl
 
 Requires OPENAI_API_KEY (NaviGator Toolkit) in .env.
 Exit 0 on completion (regardless of score), 1 on setup failure.
@@ -35,31 +38,27 @@ from dotenv import load_dotenv
 
 load_dotenv(PROJECT_ROOT / ".env")
 
-# Minimal Django setup — only needed for importing scoring modules.
 import django
 django.setup()
 
-from apps.evidence.scoring.conflict_judge import judge_conflict_text
+from apps.evidence.scoring.reward_voting import compute_reward_text
 from apps.evidence.utils.dataset_loader import (
     load_benchmark_records,
     load_conflict_pairs,
 )
 
+
 # ── Gold-label normalisation ──────────────────────────────────────────────────
 
-_SUPPORT_LABELS = {"support", "supports", "supported", "true", "yes"}
-_CONTRADICT_LABELS = {"contradict", "contradicts", "contradicted",
-                      "conflict", "conflict_or_conditionally_supported",
-                      "false", "no"}
-
-
-def _gold_to_verdict(gold: str) -> str:
+def _gold_to_answer(gold: str) -> str:
+    """Map SUPPORTS/CONTRADICTS/NEI (or yes/no/maybe) to yes/no/maybe."""
     g = str(gold).lower().strip()
-    if g in _SUPPORT_LABELS:
-        return "SUPPORTS"
-    if g in _CONTRADICT_LABELS:
-        return "CONTRADICTS"
-    return "NEI"
+    if g in ("supports", "supported", "yes", "true"):
+        return "yes"
+    if g in ("contradicts", "contradicted", "conflict",
+             "conflict_or_conditionally_supported", "no", "false", "refutes"):
+        return "no"
+    return "maybe"
 
 
 # ── Record normalisation ──────────────────────────────────────────────────────
@@ -83,40 +82,35 @@ def _flatten_records(records: list[dict]) -> list[dict]:
         text_b = _sentences_text(doc_b)
 
         # For claim-verification records (document_b is null):
-        # treat the input_claim_or_question as text_a, document_a as text_b.
+        # treat input_claim_or_question as the question, document_a as the abstract.
         if not text_b:
             text_a = r.get("input_claim_or_question", "")
             text_b = _sentences_text(doc_a)
 
+        gold_answer = _gold_to_answer(r.get("gold_label", ""))
+
         out.append({
-            "id": r.get("id", ""),
+            "id":             r.get("id", ""),
             "source_dataset": r.get("source_dataset", ""),
-            "task_type": r.get("task_type", ""),
-            "title_a": doc_a.get("title", "") or "Claim",
-            "title_b": doc_b.get("title", "") or doc_a.get("title", "") or "Document",
-            "text_a": text_a,
-            "text_b": text_b,
-            "gold_verdict": _gold_to_verdict(r.get("gold_label", "")),
-            "target_error_types": r.get("target_error_types") or [],
+            "task_type":      r.get("task_type", ""),
+            "question":       text_a,     # claim or question
+            "abstract":       text_b,     # supporting document
+            "gold_answer":    gold_answer,
         })
     return out
 
 
 # ── Metrics ───────────────────────────────────────────────────────────────────
 
-def _jaccard(a: list, b: list) -> float:
-    sa, sb = set(a), set(b)
-    if not sa and not sb:
-        return 1.0
-    inter = len(sa & sb)
-    union = len(sa | sb)
-    return inter / union if union else 0.0
-
-
 def _accuracy(preds: list[str], golds: list[str]) -> float:
     if not preds:
         return 0.0
     return sum(p == g for p, g in zip(preds, golds)) / len(preds)
+
+
+def _avg(vals: list) -> float:
+    filtered = [v for v in vals if v is not None]
+    return sum(filtered) / len(filtered) if filtered else 0.0
 
 
 def _confusion(preds: list[str], golds: list[str]) -> dict:
@@ -153,41 +147,53 @@ def run_benchmark(
     for i, rec in enumerate(records, 1):
         print(
             f"  [{i}/{len(records)}] {rec['id']}  "
-            f"({rec['source_dataset']})  gold={rec['gold_verdict']}",
+            f"({rec['source_dataset']})  gold={rec['gold_answer']}",
             end=" ... ",
             flush=True,
         )
         try:
-            pred = judge_conflict_text(
-                text_a=rec["text_a"],
-                text_b=rec["text_b"],
-                title_a=rec["title_a"],
-                title_b=rec["title_b"],
+            result = compute_reward_text(
+                question=rec["question"],
+                abstract=rec["abstract"],
+                gold_label=rec["gold_answer"],
+                n_samples=1,
             )
-            verdict = pred.get("verdict", "NEI")
-            error_types = pred.get("error_types", [])
-            jaccard = _jaccard(error_types, rec["target_error_types"])
-            correct = verdict == rec["gold_verdict"]
-            print(f"pred={verdict}  {'OK' if correct else 'WRONG'}  jaccard={jaccard:.2f}")
+            predicted  = result["answer"]
+            correct    = result["correct"]
+            confidence = result["final_confidence"]
+            nli_score  = result["nli_score"]
+            format_ok  = result["format_score"] > 0.5
+
+            print(f"pred={predicted}  {'OK' if correct else 'WRONG'}")
+            if nli_score is not None:
+                print(f"    nli_score={nli_score:.3f}  format={'OK' if format_ok else 'FAIL'}"
+                      f"  confidence={confidence:.3f}")
+            else:
+                print(f"    nli_score=None  format={'OK' if format_ok else 'FAIL'}"
+                      f"  confidence={confidence:.3f}")
+
         except Exception as e:
-            verdict = "NEI"
-            error_types = []
-            jaccard = 0.0
-            correct = verdict == rec["gold_verdict"]
-            pred = {}
+            predicted  = "maybe"
+            correct    = predicted == rec["gold_answer"]
+            confidence = 0.0
+            nli_score  = None
+            format_ok  = False
+            result     = {}
             print(f"ERROR: {e}")
 
         results.append({
-            "id": rec["id"],
+            "id":             rec["id"],
             "source_dataset": rec["source_dataset"],
-            "task_type": rec["task_type"],
-            "gold_verdict": rec["gold_verdict"],
-            "pred_verdict": verdict,
-            "correct": correct,
-            "target_error_types": rec["target_error_types"],
-            "pred_error_types": error_types,
-            "error_type_jaccard": jaccard,
-            "reasoning": pred.get("reasoning", ""),
+            "task_type":      rec["task_type"],
+            "gold_answer":    rec["gold_answer"],
+            "pred_answer":    predicted,
+            "correct":        correct,
+            "outcome_reward": result.get("outcome_reward"),
+            "nli_score":      nli_score,
+            "consistency":    result.get("consistency", 1.0),
+            "format_score":   result.get("format_score", 0.0),
+            "final_confidence": confidence,
+            "reasoning":      result.get("reasoning", ""),
         })
 
     if out_path:
@@ -205,17 +211,16 @@ def print_report(results: list[dict]) -> None:
         print("No results.")
         return
 
-    preds = [r["pred_verdict"] for r in results]
-    golds = [r["gold_verdict"] for r in results]
+    preds = [r["pred_answer"]  for r in results]
+    golds = [r["gold_answer"]  for r in results]
 
     overall_acc = _accuracy(preds, golds)
-    avg_jaccard = sum(r["error_type_jaccard"] for r in results) / len(results)
+    n_correct   = sum(r["correct"] for r in results)
 
     print(f"\n{'=' * 60}")
     print(f"BENCHMARK RESULTS  ({len(results)} records)")
     print(f"{'=' * 60}")
-    print(f"  Overall verdict accuracy : {overall_acc:.3f} ({sum(r['correct'] for r in results)}/{len(results)})")
-    print(f"  Avg error-type Jaccard   : {avg_jaccard:.3f}")
+    print(f"  Overall accuracy : {overall_acc:.3f} ({n_correct}/{len(results)})")
 
     # Per-dataset breakdown
     by_dataset: dict[str, list[dict]] = defaultdict(list)
@@ -224,36 +229,41 @@ def print_report(results: list[dict]) -> None:
 
     print(f"\n  Per-dataset accuracy:")
     for ds, recs in sorted(by_dataset.items()):
-        ds_preds = [r["pred_verdict"] for r in recs]
-        ds_golds = [r["gold_verdict"] for r in recs]
-        ds_acc = _accuracy(ds_preds, ds_golds)
-        print(f"    {ds:<35} {ds_acc:.3f}  ({sum(r['correct'] for r in recs)}/{len(recs)})")
+        ds_preds = [r["pred_answer"] for r in recs]
+        ds_golds = [r["gold_answer"] for r in recs]
+        ds_acc   = _accuracy(ds_preds, ds_golds)
+        ds_correct = sum(r["correct"] for r in recs)
+        print(f"    {ds:<35} {ds_acc:.3f}  ({ds_correct}/{len(recs)})")
 
-    # Verdict distribution
-    print(f"\n  Predicted verdict distribution:")
-    for verdict, count in sorted(Counter(preds).items()):
-        print(f"    {verdict:<15} {count}")
+    # Answer distribution
+    print(f"\n  Predicted answer distribution:")
+    for ans, count in sorted(Counter(preds).items()):
+        print(f"    {ans:<10} {count}")
 
     print(f"\n  Confusion matrix (rows=gold, cols=pred):")
     matrix = _confusion(preds, golds)
     _print_confusion(matrix)
 
-    # Error type breakdown
-    all_target = [t for r in results for t in r["target_error_types"]]
-    all_pred_et = [t for r in results for t in r["pred_error_types"]]
-    if all_target:
-        print(f"\n  Target error-type frequency:")
-        for et, cnt in Counter(all_target).most_common():
-            print(f"    {et:<40} {cnt}")
-        print(f"\n  Predicted error-type frequency:")
-        for et, cnt in Counter(all_pred_et).most_common(10):
-            print(f"    {et:<40} {cnt}")
+    # Four-component breakdown
+    outcome_vals    = [r["outcome_reward"]   for r in results]
+    nli_vals        = [r["nli_score"]        for r in results]
+    consistency_vals = [r["consistency"]     for r in results]
+    format_vals     = [r["format_score"]     for r in results]
+    confidence_vals = [r["final_confidence"] for r in results]
 
     print(f"\n{'=' * 60}")
+    print(f"  === Four-Component Reward Breakdown ===")
+    print(f"  Outcome reward (when gold available):  {_avg(outcome_vals):.3f} avg")
+    print(f"  NLI grounding score:                   {_avg(nli_vals):.3f} avg"
+          f"  ({sum(1 for v in nli_vals if v is not None)}/{len(nli_vals)} available)")
+    print(f"  Consistency score:                     {_avg(consistency_vals):.3f} avg")
+    print(f"  Format score:                          {_avg(format_vals):.3f} avg")
+    print(f"  Final confidence:                      {_avg(confidence_vals):.3f} avg")
+    print(f"{'=' * 60}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="EvidenceTrace conflict-detection benchmark")
+    parser = argparse.ArgumentParser(description="EvidenceTrace evidence QA benchmark")
     parser.add_argument("--limit", type=int, default=None, help="Max records to evaluate")
     parser.add_argument(
         "--dataset",
@@ -276,15 +286,15 @@ def main() -> None:
         sys.exit(1)
 
     print("Loading benchmark records...")
-    benchmark = _flatten_records(load_benchmark_records())
+    benchmark     = _flatten_records(load_benchmark_records())
     conflict_pairs = _flatten_records(load_conflict_pairs())
-    all_records = benchmark + conflict_pairs
+    all_records   = benchmark + conflict_pairs
     print(f"  benchmark_records.jsonl  : {len(benchmark)} records")
     print(f"  conflict_pairs.jsonl     : {len(conflict_pairs)} records")
     print(f"  Total                    : {len(all_records)} records")
 
     if args.dataset:
-        ds_filter = args.dataset.lower()
+        ds_filter   = args.dataset.lower()
         all_records = [r for r in all_records if ds_filter in r["source_dataset"].lower()]
         print(f"  After --dataset filter   : {len(all_records)} records")
 

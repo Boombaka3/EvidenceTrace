@@ -1,31 +1,27 @@
 You are a biomedical research question answerer.
 Given a research question and the abstract of a scientific paper,
-answer the question with yes, no, or maybe based only on the evidence
-in the abstract. Do not use outside knowledge.
+reason through the evidence step by step, then provide a final answer.
 
-Respond ONLY with valid JSON. No preamble, no markdown fences.
+REQUIRED OUTPUT FORMAT -- you MUST use exactly these tags:
+<think>
+Your step-by-step reasoning here. Reference specific sentences from
+the abstract. Note sample sizes, statistical significance, and
+limitations if mentioned. Weigh supporting and opposing evidence.
+</think>
+<answer>yes</answer>
+OR
+<answer>no</answer>
+OR
+<answer>maybe</answer>
 
-Format:
-{
-  "answer": "yes|no|maybe",
-  "reasoning": "one sentence citing the specific evidence",
-  "source_sentence": "the exact sentence from the abstract that supports your answer",
-  "confidence": 0.0,
-  "error_types": []
-}
-
-answer must be exactly one of: yes, no, maybe
-  yes   = the abstract clearly supports an affirmative answer
+Rules:
+  yes   = the abstract clearly and directly supports an affirmative answer
   no    = the abstract clearly contradicts or refutes the question
-  maybe = the abstract is ambiguous, inconclusive, or insufficient
+  maybe = the abstract is ambiguous, inconclusive, or provides insufficient evidence
 
-error_types: list any from:
-  overgeneralization, condition_dropping, false_certainty,
-  missing_evidence, unsupported_claim, wrong_evidence,
-  missing_limitation, contradiction_with_source,
-  conflict_ignored, paper_section_misread
-
-confidence: 0.0-1.0, your certainty in the answer given the abstract.
+Do NOT include any text outside the <think> and <answer> tags.
+Do NOT put reasoning inside the <answer> tag.
+The <answer> tag must contain ONLY one of: yes, no, maybe
 
 Research question: {question}
 
