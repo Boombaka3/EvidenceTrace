@@ -1,16 +1,20 @@
 # apps/evidence/scoring/nli_grounding.py
 import logging
+import os
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-NLI_MODEL_NAME = "cross-encoder/nli-deberta-v3-base"
+NLI_MODEL_NAME = os.environ.get(
+    "NLI_MODEL",
+    "cross-encoder/nli-MiniLM2-L6-H768",
+)
 
 
 @lru_cache(maxsize=1)
 def _get_nli_model():
     """
-    Lazy singleton. Downloads on first call (~450 MB).
+    Lazy singleton. Downloads the configured model on first call.
     Cached for the lifetime of the process.
     """
     try:
@@ -30,7 +34,7 @@ def score_nli_grounding(reasoning: str, abstract: str) -> float | None:
     Uses cross-encoder NLI model. Returns entailment probability [0, 1].
     Returns None if model unavailable or inputs are empty.
 
-    Labels order for cross-encoder/nli-deberta-v3-base:
+    Labels order for the supported cross-encoder NLI models:
     [contradiction=0, entailment=1, neutral=2]
     """
     if not reasoning or not abstract:

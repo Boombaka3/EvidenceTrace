@@ -45,12 +45,12 @@ def seed_tenant():
 def verify_evidence_schema():
     from django_tenants.utils import schema_context
     with schema_context("demo"):
-        from apps.evidence.models import AnalysisJob, Paper, Claim, ConflictPair, RewardScore
+        from apps.evidence.models import AnalysisJob, AnswerRecord, Claim, Paper, RewardScore
         counts = {
             "AnalysisJob":  AnalysisJob.objects.count(),
             "Paper":        Paper.objects.count(),
             "Claim":        Claim.objects.count(),
-            "ConflictPair": ConflictPair.objects.count(),
+            "AnswerRecord": AnswerRecord.objects.count(),
             "RewardScore":  RewardScore.objects.count(),
         }
         for model, count in counts.items():

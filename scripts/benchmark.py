@@ -26,6 +26,7 @@ Exit 0 on completion (regardless of score), 1 on setup failure.
 import argparse
 import json
 import os
+import random
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -53,9 +54,9 @@ from apps.evidence.utils.dataset_loader import (
 def _gold_to_answer(gold: str) -> str:
     """Map SUPPORTS/CONTRADICTS/NEI (or yes/no/maybe) to yes/no/maybe."""
     g = str(gold).lower().strip()
-    if g in ("supports", "supported", "yes", "true"):
+    if g in ("support", "supports", "supported", "yes", "true"):
         return "yes"
-    if g in ("contradicts", "contradicted", "conflict",
+    if g in ("contradict", "contradicts", "contradicted", "conflict",
              "conflict_or_conditionally_supported", "no", "false", "refutes"):
         return "no"
     return "maybe"
@@ -87,7 +88,8 @@ def _flatten_records(records: list[dict]) -> list[dict]:
             text_a = r.get("input_claim_or_question", "")
             text_b = _sentences_text(doc_a)
 
-        gold_answer = _gold_to_answer(r.get("gold_label", ""))
+        raw_gold = r.get("gold_answer") or r.get("gold_label", "")
+        gold_answer = _gold_to_answer(raw_gold) if raw_gold else ""
 
         out.append({
             "id":             r.get("id", ""),
@@ -98,6 +100,42 @@ def _flatten_records(records: list[dict]) -> list[dict]:
             "gold_answer":    gold_answer,
         })
     return out
+
+
+def stratified_sample(records: list[dict], limit: int, seed: int = 42) -> list[dict]:
+    """Sample as equally as possible from each gold-label class."""
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for record in records:
+        gold = record.get("gold_answer") or record.get("gold_label", "unknown")
+        groups[str(gold).lower().strip()].append(record)
+
+    if not groups:
+        return records[:limit]
+
+    rng = random.Random(seed)
+    pools = {label: rng.sample(group, len(group)) for label, group in groups.items()}
+    positions = {label: 0 for label in groups}
+    sampled: list[dict] = []
+    remaining = min(limit, len(records))
+    active = sorted(groups)
+
+    # Reallocate unused quotas when a small class cannot supply its share.
+    while remaining and active:
+        per_group = max(1, remaining // len(active))
+        next_active = []
+        for label in active:
+            available = len(pools[label]) - positions[label]
+            take = min(per_group, available, remaining)
+            start = positions[label]
+            sampled.extend(pools[label][start:start + take])
+            positions[label] += take
+            remaining -= take
+            if positions[label] < len(pools[label]) and remaining:
+                next_active.append(label)
+        active = next_active
+
+    rng.shuffle(sampled)
+    return sampled[:limit]
 
 
 # ── Metrics ───────────────────────────────────────────────────────────────────
@@ -174,7 +212,7 @@ def run_benchmark(
 
         except Exception as e:
             predicted  = "maybe"
-            correct    = predicted == rec["gold_answer"]
+            correct    = bool(rec["gold_answer"]) and predicted == rec["gold_answer"]
             confidence = 0.0
             nli_score  = None
             format_ok  = False
@@ -277,6 +315,11 @@ def main() -> None:
         default=None,
         help="Path to write per-record JSONL results",
     )
+    parser.add_argument(
+        "--stratify",
+        action="store_true",
+        help="Sample equally from each gold label class",
+    )
     args = parser.parse_args()
 
     api_key = os.environ.get("OPENAI_API_KEY", "")
@@ -302,10 +345,22 @@ def main() -> None:
         print("No records to evaluate after filtering.")
         sys.exit(0)
 
+    limit = args.limit or len(all_records)
+    if args.stratify:
+        all_records = stratified_sample(all_records, limit)
+        print(f"Stratified sample: {len(all_records)} records")
+        dist = Counter(
+            (r.get("gold_answer") or r.get("gold_label", "")).lower()
+            for r in all_records
+        )
+        print(f"Gold distribution: {dict(dist)}")
+    else:
+        all_records = all_records[:limit]
+
     out_path = Path(args.out) if args.out else None
 
-    print(f"\nRunning benchmark (n={min(args.limit or len(all_records), len(all_records))})...\n")
-    results = run_benchmark(all_records, limit=args.limit, out_path=out_path)
+    print(f"\nRunning benchmark (n={len(all_records)})...\n")
+    results = run_benchmark(all_records, limit=None, out_path=out_path)
     print_report(results)
 
 
