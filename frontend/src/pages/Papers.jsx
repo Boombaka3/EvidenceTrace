@@ -1,5 +1,4 @@
-// frontend/src/pages/Papers.jsx
-import { useState, useRef, Fragment } from 'react'
+import { useState, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { listPapers, uploadPaper, dispatchJob, dispatchJobSync, deletePaper, getJob } from '../api/client.js'
@@ -10,23 +9,21 @@ import { ErrorState } from '../components/ErrorState.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
 
 function fmtDate(iso) {
-  if (!iso) return '—'
+  if (!iso) return '-'
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function UploadIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-         stroke="#8a8f98" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8a8f98" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
     </svg>
   )
 }
 
 function XIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
-         stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
       <line x1="1" y1="1" x2="11" y2="11" />
       <line x1="11" y1="1" x2="1" y2="11" />
     </svg>
@@ -42,23 +39,21 @@ function ItemStatus({ status, error }) {
       </span>
     )
   }
-  if (status === 'done')  return <span className="text-[#27a644] font-mono text-xs">done</span>
-  if (status === 'error') return <span className="text-[#EF4444] font-mono text-xs">failed — {error}</span>
+  if (status === 'done') return <span className="text-[#27a644] font-mono text-xs">done</span>
+  if (status === 'error') return <span className="text-[#EF4444] font-mono text-xs">failed - {error}</span>
   return <span className="text-[#62666d] font-mono text-xs">waiting...</span>
 }
 
 export default function Papers() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { data: papers, loading, error, isMock, refetch } = useApi(
-    () => listPapers(id), MOCK_PAPERS, [id]
-  )
+  const { data: papers, loading, error, isMock, refetch } = useApi(() => listPapers(id), MOCK_PAPERS, [id])
   const { data: job } = useApi(() => getJob(id), null, [id])
 
-  const [dragOver,    setDragOver]    = useState(false)
-  const [queue,       setQueue]       = useState([])
-  const [uploading,   setUploading]   = useState(false)
-  const [nonPdfWarn,  setNonPdfWarn]  = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const [queue, setQueue] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [nonPdfWarn, setNonPdfWarn] = useState(false)
   const [dispatching, setDispatching] = useState(false)
   const fileInputRef = useRef(null)
 
@@ -69,6 +64,7 @@ export default function Papers() {
     const pdfs = all.filter(f => f.name.toLowerCase().endsWith('.pdf'))
     setNonPdfWarn(pdfs.length < all.length)
     if (!pdfs.length) return
+
     setQueue(prev => [
       ...prev,
       ...pdfs.map(f => ({
@@ -85,6 +81,7 @@ export default function Papers() {
     const snapshot = queue
     setUploading(true)
     let allDone = true
+
     for (const item of snapshot) {
       setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'uploading' } : q))
       try {
@@ -95,6 +92,7 @@ export default function Papers() {
         allDone = false
       }
     }
+
     setUploading(false)
     refetch()
     if (allDone) setTimeout(() => setQueue([]), 2000)
@@ -112,12 +110,10 @@ export default function Papers() {
   async function handleDispatch() {
     setDispatching(true)
     try {
-      // Try sync dispatch first (works on free tier, no Celery needed)
       await dispatchJobSync(id)
       navigate(`/jobs/${id}/status`)
     } catch (err) {
       if (err.message.includes('400')) {
-        // Too many papers for sync -- use async
         await dispatchJob(id)
         navigate(`/jobs/${id}/status`)
       } else {
@@ -135,18 +131,16 @@ export default function Papers() {
 
       <div className="px-8 py-8">
         <Link to="/jobs" className="text-[#8a8f98] text-xs hover:text-[#5e6ad2] transition-colors mb-4 block">
-          ← Jobs
+          {'<-'} Jobs
         </Link>
 
         <h1 className="text-lg font-semibold text-[#f7f8f8] mb-6">
-          Job #{id} — Papers
+          Job #{id} - Papers
         </h1>
 
-        {/* ── Upload section ──────────────────────────────────────────────── */}
         <div className="bg-[#0f1011] border border-[#23252a] rounded-[12px] p-5 mb-6">
           <p className="text-[#8a8f98] text-xs uppercase tracking-wider mb-4">Upload Papers</p>
 
-          {/* Drag zone */}
           {!uploading && (
             <div
               onClick={() => fileInputRef.current?.click()}
@@ -157,12 +151,9 @@ export default function Papers() {
                 setDragOver(false)
                 addFilesToQueue(e.dataTransfer.files)
               }}
-              className={`border-2 border-dashed rounded-[12px] p-12
-                         flex flex-col items-center justify-center gap-3
-                         cursor-pointer transition-colors
-                         ${dragOver
-                           ? 'border-[#5e6ad2] bg-[#5e6ad2]/5'
-                           : 'border-[#23252a] hover:border-[#5e6ad2]'}`}
+              className={`border-2 border-dashed rounded-[12px] p-12 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors ${
+                dragOver ? 'border-[#5e6ad2] bg-[#5e6ad2]/5' : 'border-[#23252a] hover:border-[#5e6ad2]'
+              }`}
             >
               <UploadIcon />
               <p className="text-[#8a8f98] text-sm">Drag PDF files here</p>
@@ -170,8 +161,7 @@ export default function Papers() {
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}
-                className="bg-[#0f1011] border border-[#23252a] hover:border-[#5e6ad2]
-                           text-[#d0d6e0] text-xs px-3 py-1.5 rounded-[8px] transition-colors"
+                className="bg-[#0f1011] border border-[#23252a] hover:border-[#5e6ad2] text-[#d0d6e0] text-xs px-3 py-1.5 rounded-[8px] transition-colors"
               >
                 Browse files
               </button>
@@ -190,20 +180,16 @@ export default function Papers() {
 
           {nonPdfWarn && (
             <p className="text-[#F59E0B] text-xs font-mono mt-3">
-              Only PDF files are accepted — non-PDF files were skipped.
+              Only PDF files are accepted - non-PDF files were skipped.
             </p>
           )}
 
-          {/* Queue list */}
           {queue.length > 0 && !uploading && (
             <div className="mt-4 space-y-2">
               {queue.map(item => (
-                <div key={item.id}
-                  className="flex items-center gap-2 bg-[#141516] border border-[#23252a]
-                             rounded-[8px] px-3 py-2">
-                  <span className="text-[#8a8f98] text-xs font-mono flex-shrink-0 w-40 truncate"
-                        title={item.file.name}>
-                    {item.file.name.length > 30 ? item.file.name.slice(0, 30) + '…' : item.file.name}
+                <div key={item.id} className="flex items-center gap-2 bg-[#141516] border border-[#23252a] rounded-[8px] px-3 py-2">
+                  <span className="text-[#8a8f98] text-xs font-mono flex-shrink-0 w-40 truncate" title={item.file.name}>
+                    {item.file.name.length > 30 ? `${item.file.name.slice(0, 30)}...` : item.file.name}
                   </span>
                   <input
                     type="text"
@@ -212,9 +198,7 @@ export default function Papers() {
                       const v = e.target.value
                       setQueue(prev => prev.map(q => q.id === item.id ? { ...q, title: v } : q))
                     }}
-                    className="flex-1 bg-[#141516] border border-[#23252a] rounded-[8px]
-                               px-2 py-1 text-[#f7f8f8] text-sm
-                               focus:outline-none focus:border-[#5e6ad2] transition-colors"
+                    className="flex-1 bg-[#141516] border border-[#23252a] rounded-[8px] px-2 py-1 text-[#f7f8f8] text-sm focus:outline-none focus:border-[#5e6ad2] transition-colors"
                   />
                   <button
                     type="button"
@@ -231,24 +215,19 @@ export default function Papers() {
                 type="button"
                 onClick={uploadAll}
                 disabled={uploading}
-                className="w-full mt-3 py-2.5 bg-[#5e6ad2] hover:bg-[#828fff]
-                           text-white text-sm rounded-[8px] transition-colors
-                           disabled:opacity-50"
+                className="w-full mt-3 py-2.5 bg-[#5e6ad2] hover:bg-[#828fff] text-white text-sm rounded-[8px] transition-colors disabled:opacity-50"
               >
                 Upload {queue.length} paper{queue.length !== 1 ? 's' : ''}
               </button>
             </div>
           )}
 
-          {/* Upload progress */}
           {uploading && (
             <div className="mt-4 space-y-2">
               {queue.map(item => (
-                <div key={item.id}
-                  className="flex items-center gap-3 bg-[#141516] border border-[#23252a]
-                             rounded-[8px] px-3 py-2">
+                <div key={item.id} className="flex items-center gap-3 bg-[#141516] border border-[#23252a] rounded-[8px] px-3 py-2">
                   <span className="text-[#8a8f98] text-xs font-mono flex-shrink-0 w-40 truncate">
-                    {item.file.name.length > 30 ? item.file.name.slice(0, 30) + '…' : item.file.name}
+                    {item.file.name.length > 30 ? `${item.file.name.slice(0, 30)}...` : item.file.name}
                   </span>
                   <ItemStatus status={item.status} error={item.error} />
                 </div>
@@ -263,7 +242,6 @@ export default function Papers() {
           )}
         </div>
 
-        {/* ── Papers table ────────────────────────────────────────────────── */}
         {loading && <LoadingState rows={3} />}
         {error && !isMock && <ErrorState message={error} onRetry={refetch} />}
 
@@ -272,8 +250,7 @@ export default function Papers() {
             <thead>
               <tr className="bg-[#0f1011] border-y border-[#23252a]">
                 {['Title', 'Claims', 'Uploaded', ''].map(h => (
-                  <th key={h} className="text-[#8a8f98] text-[11px] font-medium uppercase
-                                         tracking-wider px-4 py-3 text-left">
+                  <th key={h} className="text-[#8a8f98] text-[11px] font-medium uppercase tracking-wider px-4 py-3 text-left">
                     {h}
                   </th>
                 ))}
@@ -281,25 +258,22 @@ export default function Papers() {
             </thead>
             <tbody>
               {papers.map(p => {
-                const claimCount = p.claims_count ?? 0
+                const claimCount = p.claim_count ?? 0
                 return (
                   <tr key={p.id} className="border-b border-[#23252a] hover:bg-[#0f1011] transition-colors">
                     <td className="px-4 py-3 text-[#f7f8f8] text-sm max-w-xs">
                       <span title={p.title}>
                         {(p.title || `Paper ${p.id}`).length > 40
-                          ? (p.title || `Paper ${p.id}`).slice(0, 40) + '…'
+                          ? `${(p.title || `Paper ${p.id}`).slice(0, 40)}...`
                           : (p.title || `Paper ${p.id}`)}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">
                       {claimCount > 0
                         ? <span className="text-[#5e6ad2]">{claimCount}</span>
-                        : <span className="text-[#62666d]">{job?.status === 'DONE' ? '0' : '—'}</span>
-                      }
+                        : <span className="text-[#62666d]">{job?.status === 'DONE' ? '0' : '-'}</span>}
                     </td>
-                    <td className="px-4 py-3 text-[#8a8f98] text-xs">
-                      {fmtDate(p.created_at)}
-                    </td>
+                    <td className="px-4 py-3 text-[#8a8f98] text-xs">{fmtDate(p.created_at)}</td>
                     <td className="px-4 py-3">
                       {isPending && (
                         <button
@@ -319,24 +293,21 @@ export default function Papers() {
 
         {papers && papers.length === 0 && !loading && (
           <p className="text-[#8a8f98] text-sm py-8 text-center">
-            No papers uploaded yet. Upload at least two to detect conflicts.
+            No papers uploaded yet. Upload at least two to run extraction and QA.
           </p>
         )}
 
-        {/* ── Dispatch ────────────────────────────────────────────────────── */}
         <div className="mt-4 flex items-center gap-3">
           <button
             onClick={handleDispatch}
             disabled={dispatching || !papers || papers.length < 2}
-            className="px-4 py-2 bg-[#27a644] hover:bg-[#27a644]/80 text-white
-                       text-sm rounded-[8px] transition-colors
-                       disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-[#27a644] hover:bg-[#27a644]/80 text-white text-sm rounded-[8px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {dispatching ? 'Dispatching…' : 'Run Analysis →'}
+            {dispatching ? 'Dispatching...' : 'Run Analysis ->'}
           </button>
           {papers && papers.length < 2 && (
             <span className="text-[#62666d] text-xs">
-              Upload at least 2 papers to run analysis
+              Upload at least 2 papers to run extraction and QA
             </span>
           )}
         </div>

@@ -95,6 +95,42 @@ def test_question_answerer_json_fallback_format_false(paper_a):
             assert result._format_ok is False
 
 
+def test_parse_response_valid_tags():
+    from apps.evidence.scoring.question_answerer import _parse_response
+
+    parsed = _parse_response(YES_TAGGED)
+    assert parsed["answer"] == "yes"
+    assert parsed["format_ok"] is True
+    assert "directly supports" in parsed["reasoning"].lower()
+
+
+def test_parse_response_fallback_json():
+    from apps.evidence.scoring.question_answerer import _parse_response
+
+    parsed = _parse_response(YES_JSON)
+    assert parsed["answer"] == "yes"
+    assert parsed["format_ok"] is False
+    assert parsed["confidence"] == pytest.approx(0.9)
+
+
+def test_parse_response_invalid_answer_normalizes():
+    from apps.evidence.scoring.question_answerer import _parse_response
+
+    parsed = _parse_response('{"answer":"uncertain","reasoning":"x","source_sentence":"y"}')
+    assert parsed["answer"] == "maybe"
+    assert parsed["format_ok"] is False
+
+
+def test_clamp_bounds():
+    from apps.evidence.scoring.question_answerer import _clamp
+
+    assert _clamp(0.5) == pytest.approx(0.5)
+    assert _clamp(-1) == 0.0
+    assert _clamp(2) == 1.0
+    assert _clamp("0.25") == pytest.approx(0.25)
+    assert _clamp("bad") is None
+
+
 # ── NLI grounding tests ────────────────────────────────────────────────────────
 
 def test_nli_grounding_returns_float_or_none():
@@ -132,6 +168,24 @@ def test_outcome_reward_normalization():
     assert _compute_outcome_reward("no",  "contradicts") == 1.0
     assert _compute_outcome_reward("yes", "refutes")     == 0.0
     assert _compute_outcome_reward("maybe", "nei")       == 1.0
+
+
+def test_compute_format_score_true(paper_a):
+    from apps.evidence.models import AnswerRecord
+    from apps.evidence.scoring.reward_voting import _compute_format_score
+
+    record = AnswerRecord(paper=paper_a, question="Q?", answer="yes", reasoning="r", source_sentence="s")
+    record._format_ok = True
+    assert _compute_format_score(record) == 1.0
+
+
+def test_compute_format_score_false(paper_a):
+    from apps.evidence.models import AnswerRecord
+    from apps.evidence.scoring.reward_voting import _compute_format_score
+
+    record = AnswerRecord(paper=paper_a, question="Q?", answer="yes", reasoning="r", source_sentence="s")
+    record._format_ok = False
+    assert _compute_format_score(record) == 0.0
 
 
 # ── reward_voting tests ────────────────────────────────────────────────────────
@@ -234,3 +288,23 @@ def test_reward_voting_four_components(paper_a):
                 # outcome=1.0 (yes==yes), grounding=0.85, consistency=1.0, format=1.0
                 # 0.4*1.0 + 0.3*0.85 + 0.2*1.0 + 0.1*1.0 = 0.4+0.255+0.2+0.1 = 0.955
                 assert reward.final_confidence == pytest.approx(0.955, abs=0.01)
+
+
+def test_low_confidence_flag(paper_a):
+    """Answers below threshold get low_confidence in error_types."""
+    with schema_context("demo"):
+        from apps.evidence.models import AnswerRecord
+
+        low_conf_record = AnswerRecord(
+            paper=paper_a, question="Test?", answer="maybe",
+            reasoning="Weak evidence.", source_sentence="Maybe.",
+        )
+        low_conf_record._format_ok = False
+
+        with patch("apps.evidence.scoring.reward_voting.answer_question",
+                   return_value=low_conf_record):
+            with patch("apps.evidence.scoring.reward_voting.score_nli_grounding",
+                       return_value=0.1):
+                from apps.evidence.scoring.reward_voting import compute_reward
+                ar, reward = compute_reward(paper_a, "Test?", n_samples=1)
+                assert reward.final_confidence < 0.5

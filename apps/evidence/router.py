@@ -94,6 +94,19 @@ def _answer_out(ar: AnswerRecord) -> dict:
     }
 
 
+def _apply_low_confidence_flag(answer_record: AnswerRecord, reward, paper_id: int):
+    threshold = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.5"))
+    if reward.final_confidence is not None and reward.final_confidence < threshold:
+        answer_record.error_types = list(set(
+            (answer_record.error_types or []) + ["low_confidence"]
+        ))
+        answer_record.save(update_fields=["error_types"])
+        logger.warning(
+            f"Low confidence answer: job={answer_record.paper.job_id} paper={paper_id} "
+            f"conf={reward.final_confidence:.3f} threshold={threshold}"
+        )
+
+
 # ── Jobs ──────────────────────────────────────────────────────────────────────
 
 @router.get("/jobs/", response=list[JobOut])
@@ -168,7 +181,7 @@ def dispatch_job(request, job_id: int):
     return {"status": "dispatched", "job_id": job_id}
 
 
-@router.post("/jobs/{job_id}/dispatch-sync/", response={200: dict})
+@router.post("/jobs/{job_id}/dispatch-sync/", response={200: dict}, auth=api_key_auth)
 def dispatch_sync(request, job_id: int):
     """
     Synchronous pipeline for demo/free-tier deployment.
@@ -270,6 +283,7 @@ def dispatch_sync(request, job_id: int):
                     answer_record.save()
                     reward.answer_record = answer_record
                     reward.save()
+                    _apply_low_confidence_flag(answer_record, reward, paper.id)
                     answers_created += 1
                 except Exception as e:
                     _logger.error(f"Answer question failed for claim {claim.id}: {e}")
@@ -315,15 +329,17 @@ def list_claims(request, job_id: int):
 # ── Answers ───────────────────────────────────────────────────────────────────
 
 @router.get("/jobs/{job_id}/answers/", response=list[AnswerRecordOut])
-def list_answers(request, job_id: int):
+def list_answers(request, job_id: int, include_low_confidence: bool = True):
     _get_or_404(AnalysisJob, job_id)
-    answers = (
+    qs = (
         AnswerRecord.objects
         .filter(paper__job_id=job_id)
         .select_related("paper", "reward")
         .order_by("created_at")
     )
-    return [AnswerRecordOut(**_answer_out(ar)) for ar in answers]
+    if not include_low_confidence:
+        qs = qs.exclude(error_types__contains=["low_confidence"])
+    return [AnswerRecordOut(**_answer_out(ar)) for ar in qs]
 
 
 @router.get("/jobs/{job_id}/traces/", response=list[AgentTraceOut])
@@ -374,6 +390,7 @@ def ask_question(request, job_id: int, payload: AskIn):
             answer_record.save()
             reward.answer_record = answer_record
             reward.save()
+            _apply_low_confidence_flag(answer_record, reward, paper.id)
             ar = AnswerRecord.objects.select_related("paper", "reward").get(
                 pk=answer_record.pk
             )
@@ -399,11 +416,19 @@ def chat_with_evidence(request, job_id: int, payload: ChatMessageIn):
     _logger = logging.getLogger(__name__)
     job = get_object_or_404(AnalysisJob, id=job_id)
 
+    threshold = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.5"))
     answers = list(
         AnswerRecord.objects.filter(paper__job=job)
+        .exclude(error_types__contains=["low_confidence"])
         .select_related("paper", "reward")
         .order_by("-reward__final_confidence")[:10]
     )
+    if not answers:
+        answers = list(
+            AnswerRecord.objects.filter(paper__job=job)
+            .select_related("paper", "reward")
+            .order_by("-reward__final_confidence")[:10]
+        )
     claims = list(
         Claim.objects.filter(paper__job=job)
         .select_related("paper")[:20]

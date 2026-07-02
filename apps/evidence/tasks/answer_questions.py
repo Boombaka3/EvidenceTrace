@@ -1,10 +1,12 @@
 # apps/evidence/tasks/answer_questions.py
 import logging
+import os
 from celery import shared_task
 from apps.evidence.models import AnalysisJob, Paper, Claim
 from apps.evidence.scoring.reward_voting import compute_reward
 
 logger = logging.getLogger(__name__)
+CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.5"))
 
 
 @shared_task(bind=True, max_retries=0)
@@ -34,6 +36,15 @@ def answer_paper_questions(self, paper_id: int, n_samples: int = 3):
                 answer_record.save()
                 reward.answer_record = answer_record
                 reward.save()
+                if reward.final_confidence is not None and reward.final_confidence < CONFIDENCE_THRESHOLD:
+                    answer_record.error_types = list(set(
+                        (answer_record.error_types or []) + ["low_confidence"]
+                    ))
+                    answer_record.save(update_fields=["error_types"])
+                    logger.warning(
+                        f"Low confidence answer: job={paper.job_id} paper={paper_id} "
+                        f"conf={reward.final_confidence:.3f} threshold={CONFIDENCE_THRESHOLD}"
+                    )
                 answered += 1
             except Exception as e:
                 logger.error(

@@ -1,12 +1,11 @@
-// frontend/src/pages/NewJob.jsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createJob } from '../api/client.js'
 
 const SAMPLE_OPTIONS = [
-  { value: 1, label: 'Quick',    desc: '1 judgment per claim pair' },
-  { value: 3, label: 'Balanced', desc: '3 judgments — recommended' },
-  { value: 5, label: 'Thorough', desc: '5 judgments — highest confidence' },
+  { value: 1, label: 'Quick', desc: '1 judgment per question' },
+  { value: 3, label: 'Balanced', desc: '3 judgments - recommended' },
+  { value: 5, label: 'Thorough', desc: '5 judgments - highest confidence' },
 ]
 
 export default function NewJob() {
@@ -36,14 +35,11 @@ export default function NewJob() {
         </h1>
 
         <p className="text-[#8a8f98] text-sm mb-6 max-w-md">
-          Upload 2 or more research PDFs. EvidenceTrace extracts structured claims
-          from each paper, compares them pairwise, and flags contradictions —
-          scored with an RL confidence measure.
+          Upload 2 or more research PDFs. EvidenceTrace extracts structured claims from each paper,
+          answers benchmark-style questions against the evidence, and scores each answer for confidence and grounding.
         </p>
 
-        <form onSubmit={handleSubmit}
-          className="bg-[#0f1011] border border-[#23252a] rounded-[12px] p-6">
-
+        <form onSubmit={handleSubmit} className="bg-[#0f1011] border border-[#23252a] rounded-[12px] p-6">
           <label className="block text-[#8a8f98] text-xs uppercase tracking-wider mb-3">
             Consistency samples
           </label>
@@ -66,17 +62,14 @@ export default function NewJob() {
             ))}
           </div>
 
-          {err && (
-            <p className="text-[#EF4444] text-xs font-mono mb-4">{err}</p>
-          )}
+          {err && <p className="text-[#EF4444] text-xs font-mono mb-4">{err}</p>}
 
           <button
             type="submit"
             disabled={creating}
-            className="w-full py-2 bg-[#5e6ad2] hover:bg-[#828fff] text-white
-                       text-sm rounded-[8px] transition-colors disabled:opacity-50"
+            className="w-full py-2 bg-[#5e6ad2] hover:bg-[#828fff] text-white text-sm rounded-[8px] transition-colors disabled:opacity-50"
           >
-            {creating ? 'Creating…' : 'Create Job'}
+            {creating ? 'Creating...' : 'Create Job'}
           </button>
         </form>
       </div>
