@@ -9,8 +9,11 @@ from ninja import File, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
+from apps.evidence.agent.loop import run_agent
 from apps.evidence.models import AgentTrace, AnalysisJob, AnswerRecord, Claim, Paper, RewardScore
 from apps.evidence.schemas import (
+    AgentRequestIn,
+    AgentResponseOut,
     AgentTraceOut,
     AnswerRecordOut,
     AskIn,
@@ -478,6 +481,23 @@ def chat_with_evidence(request, job_id: int, payload: ChatMessageIn):
 
 
 # ── Report ────────────────────────────────────────────────────────────────────
+
+@router.post("/jobs/{job_id}/agent/", response=AgentResponseOut, auth=api_key_auth)
+def run_agent_endpoint(request, job_id: int, payload: AgentRequestIn):
+    """
+    Bounded ReAct agent loop over stored job evidence.
+    Max 5 iterations. Every step logged to AgentTrace.
+    Auth required -- agent calls cost LLM tokens.
+    """
+    from django.shortcuts import get_object_or_404
+
+    job = get_object_or_404(AnalysisJob, id=job_id)
+    if job.status != AnalysisJob.Status.DONE:
+        raise HttpError(409, f"Job must be DONE to run agent. Current: {job.status}")
+    result = run_agent(job, payload.question)
+    result["job_id"] = job_id
+    return result
+
 
 @router.get("/jobs/{job_id}/report/", response=ReportOut)
 def get_report(request, job_id: int):

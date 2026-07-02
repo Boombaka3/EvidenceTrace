@@ -80,6 +80,21 @@ class AskIn(Schema):
     question: str
 
 
+class AgentRequestIn(Schema):
+    question: str
+
+
+class AgentResponseOut(Schema):
+    session_id: str
+    question: str
+    answer: str
+    confidence: float
+    reasoning: str
+    iterations: int
+    model: str
+    job_id: int
+
+
 class ChatMessageIn(Schema):
     question: str
 
