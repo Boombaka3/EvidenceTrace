@@ -112,3 +112,43 @@ def test_reward_score_one_to_one(paper_a):
         assert refreshed.reward.pk == r.pk
         r.delete()
         ar.delete()
+
+
+def test_agent_trace_creates(job):
+    with schema_context("demo"):
+        import uuid
+
+        from apps.evidence.models import AgentTrace
+
+        sid = str(uuid.uuid4())
+        t = AgentTrace.objects.create(
+            job=job,
+            session_id=sid,
+            iteration=0,
+            role=AgentTrace.Role.THOUGHT,
+            tool_name=AgentTrace.ToolName.NONE,
+            tool_input={},
+            tool_output={},
+            model_version="llama-3.3-70b-instruct",
+        )
+        assert t.role == "thought"
+        assert t.session_id == sid
+        t.delete()
+
+
+def test_agent_trace_ordering(job):
+    with schema_context("demo"):
+        from apps.evidence.models import AgentTrace
+
+        sid = "test-session-ordering"
+        for i in range(3):
+            AgentTrace.objects.create(
+                job=job,
+                session_id=sid,
+                iteration=i,
+                role=AgentTrace.Role.ACTION,
+                tool_name=AgentTrace.ToolName.LLM,
+            )
+        traces = list(AgentTrace.objects.filter(session_id=sid))
+        assert [t.iteration for t in traces] == [0, 1, 2]
+        AgentTrace.objects.filter(session_id=sid).delete()

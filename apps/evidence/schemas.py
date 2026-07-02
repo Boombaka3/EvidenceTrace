@@ -45,6 +45,22 @@ class RewardScoreOut(Schema):
     n_samples: int
 
 
+class AgentTraceOut(Schema):
+    id: int
+    session_id: str
+    iteration: int
+    role: str
+    tool_name: str
+    tool_input: dict
+    tool_output: dict
+    model_version: str
+    latency_ms: Optional[int] = None
+    prompt_tokens: Optional[int] = None
+    final_answer: str
+    confidence: Optional[float] = None
+    created_at: str
+
+
 class AnswerRecordOut(Schema):
     id: int
     question: str

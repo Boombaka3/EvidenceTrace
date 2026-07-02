@@ -121,3 +121,51 @@ class RewardScore(models.Model):
     def __str__(self):
         conf = f"{self.final_confidence:.2f}" if self.final_confidence else "None"
         return f"RewardScore {self.id} confidence={conf}"
+
+
+class AgentTrace(models.Model):
+    class Role(models.TextChoices):
+        THOUGHT     = 'thought'
+        ACTION      = 'action'
+        OBSERVATION = 'observation'
+        ANSWER      = 'answer'
+        ERROR       = 'error'
+
+    class ToolName(models.TextChoices):
+        RETRIEVE  = 'retrieve_answers'
+        NLI       = 'nli_score'
+        LLM       = 'llm_call'
+        THRESHOLD = 'confidence_gate'
+        NONE      = 'none'
+
+    job           = models.ForeignKey(
+                        'AnalysisJob',
+                        on_delete=models.CASCADE,
+                        related_name='traces'
+                    )
+    session_id    = models.CharField(max_length=64)
+    iteration     = models.IntegerField(default=0)
+    role          = models.CharField(max_length=20, choices=Role.choices)
+    tool_name     = models.CharField(
+                        max_length=30,
+                        choices=ToolName.choices,
+                        default=ToolName.NONE
+                    )
+    tool_input    = models.JSONField(default=dict)
+    tool_output   = models.JSONField(default=dict)
+    model_version = models.CharField(max_length=100, blank=True)
+    latency_ms    = models.IntegerField(null=True)
+    prompt_tokens = models.IntegerField(null=True)
+    final_answer  = models.TextField(blank=True)
+    confidence    = models.FloatField(null=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "evidence"
+        ordering = ['session_id', 'iteration']
+
+    def __str__(self):
+        return (
+            f"AgentTrace job={self.job_id} session={self.session_id[:8]} "
+            f"iter={self.iteration} role={self.role}"
+        )

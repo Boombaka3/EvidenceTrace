@@ -1,7 +1,7 @@
 # apps/evidence/admin.py
 from django.contrib import admin
 
-from .models import AnalysisJob, AnswerRecord, Claim, Paper, RewardScore
+from .models import AgentTrace, AnalysisJob, AnswerRecord, Claim, Paper, RewardScore
 
 
 @admin.register(AnalysisJob)
@@ -35,3 +35,14 @@ class AnswerRecordAdmin(admin.ModelAdmin):
 @admin.register(RewardScore)
 class RewardScoreAdmin(admin.ModelAdmin):
     list_display = ['id', 'consistency_score', 'final_confidence', 'n_samples']
+
+
+@admin.register(AgentTrace)
+class AgentTraceAdmin(admin.ModelAdmin):
+    list_display  = ['id', 'job', 'session_id_short', 'iteration', 'role', 'tool_name', 'latency_ms', 'created_at']
+    list_filter   = ['role', 'tool_name']
+    search_fields = ['session_id', 'job__id']
+
+    def session_id_short(self, obj):
+        return obj.session_id[:8]
+    session_id_short.short_description = 'Session'

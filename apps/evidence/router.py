@@ -9,8 +9,9 @@ from ninja import File, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
-from apps.evidence.models import AnalysisJob, AnswerRecord, Claim, Paper, RewardScore
+from apps.evidence.models import AgentTrace, AnalysisJob, AnswerRecord, Claim, Paper, RewardScore
 from apps.evidence.schemas import (
+    AgentTraceOut,
     AnswerRecordOut,
     AskIn,
     ChatMessageIn,
@@ -320,6 +321,34 @@ def list_answers(request, job_id: int):
         .order_by("created_at")
     )
     return [AnswerRecordOut(**_answer_out(ar)) for ar in answers]
+
+
+@router.get("/jobs/{job_id}/traces/", response=list[AgentTraceOut])
+def list_traces(request, job_id: int, session_id: str = None):
+    from django.shortcuts import get_object_or_404
+
+    job = get_object_or_404(AnalysisJob, id=job_id)
+    qs = AgentTrace.objects.filter(job=job)
+    if session_id:
+        qs = qs.filter(session_id=session_id)
+    return [
+        {
+            "id":            t.id,
+            "session_id":    t.session_id,
+            "iteration":     t.iteration,
+            "role":          t.role,
+            "tool_name":     t.tool_name,
+            "tool_input":    t.tool_input,
+            "tool_output":   t.tool_output,
+            "model_version": t.model_version,
+            "latency_ms":    t.latency_ms,
+            "prompt_tokens": t.prompt_tokens,
+            "final_answer":  t.final_answer,
+            "confidence":    t.confidence,
+            "created_at":    str(t.created_at),
+        }
+        for t in qs
+    ]
 
 
 @router.post("/jobs/{job_id}/ask/", response=list[AnswerRecordOut], auth=api_key_auth)
