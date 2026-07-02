@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-07-01T20:27:52.102711",
+  "dataset": "SciFact",
+  "n_records": 200,
+  "sampling": "stratified",
+  "model": "llama-3.3-70b-instruct",
+  "n_samples": 1,
+  "overall_accuracy": 0.83,
+  "per_class": {
+    "no": {
+      "correct": 82,
+      "total": 100,
+      "accuracy": 0.82
+    },
+    "yes": {
+      "correct": 84,
+      "total": 100,
+      "accuracy": 0.84
+    }
+  },
+  "avg_nli_score": 0.1666536151082255,
+  "avg_format_score": 1.0,
+  "reward_formula": "0.4*outcome + 0.3*NLI + 0.2*consistency + 0.1*format",
+  "papers": [
+    "Med-RLVR (Zhang 2025)",
+    "MedRAGChecker (Ji 2026)",
+    "Reason and Verify (Khan 2026)"
+  ]
+}
