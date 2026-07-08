@@ -139,7 +139,7 @@ export default function Papers() {
         </h1>
 
         <div className="bg-[#0f1011] border border-[#23252a] rounded-[12px] p-5 mb-6">
-          <p className="text-[#8a8f98] text-xs uppercase tracking-wider mb-4">Upload Papers</p>
+          <p className="text-[#8a8f98] text-xs uppercase tracking-wider mb-4">Upload Research Papers</p>
 
           {!uploading && (
             <div
@@ -293,7 +293,7 @@ export default function Papers() {
 
         {papers && papers.length === 0 && !loading && (
           <p className="text-[#8a8f98] text-sm py-8 text-center">
-            No papers uploaded yet. Upload at least two to run extraction and QA.
+            No papers uploaded yet. Upload research papers to extract claims and answer questions from each paper.
           </p>
         )}
 
@@ -307,7 +307,7 @@ export default function Papers() {
           </button>
           {papers && papers.length < 2 && (
             <span className="text-[#62666d] text-xs">
-              Upload at least 2 papers to run extraction and QA
+              Upload at least 2 papers to run extraction and answer questions from each paper
             </span>
           )}
         </div>

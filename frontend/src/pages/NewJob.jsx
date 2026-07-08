@@ -35,8 +35,8 @@ export default function NewJob() {
         </h1>
 
         <p className="text-[#8a8f98] text-sm mb-6 max-w-md">
-          Upload 2 or more research PDFs. EvidenceTrace extracts structured claims from each paper,
-          answers benchmark-style questions against the evidence, and scores each answer for confidence and grounding.
+          Upload research PDFs. EvidenceTrace extracts structured claims from each paper,
+          answers yes/no/maybe per claim, and applies RL confidence scoring to each QA answer.
         </p>
 
         <form onSubmit={handleSubmit} className="bg-[#0f1011] border border-[#23252a] rounded-[12px] p-6">

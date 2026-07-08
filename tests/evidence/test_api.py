@@ -111,6 +111,29 @@ def test_upload_paper_success(job, api_key):
         assert uploaded_calls[0][1].endswith("trial.pdf")
 
 
+def test_upload_paper_endpoint(job, api_key):
+    """POST /papers/ with a minimal PDF returns a paper payload."""
+    with schema_context("demo"):
+        c = _client(api_key)
+        pdf = (
+            b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+            b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>"
+            b"endobj\nxref\n0 4\ntrailer<</Size 4/Root 1 0 R>>"
+            b"\nstartxref\n9\n%%EOF"
+        )
+        with patch("apps.evidence.router.boto3") as mock_boto:
+            mock_boto.client.return_value.upload_fileobj = lambda *args, **kwargs: None
+            mock_boto.client.return_value.create_bucket = lambda **kwargs: None
+            res = c.post(
+                f"/api/evidence/jobs/{job.id}/papers/",
+                data={"pdf_file": SimpleUploadedFile("test.pdf", pdf, "application/pdf")},
+            )
+        assert res.status_code == 200
+        data = res.json()
+        assert "id" in data
+
+
 def test_list_papers_empty(job, api_key):
     with schema_context("demo"):
         c = _client(api_key)
@@ -238,6 +261,18 @@ def test_dispatch_sync_requires_auth(job):
         assert res.status_code == 401
 
 
+def test_chat_endpoint_no_auth(job):
+    """Chat is public (read-only)."""
+    with schema_context("demo"):
+        c = Client(HTTP_HOST="demo.localhost")
+        with patch("apps.evidence.adapters.openai.OpenAICompatAdapter") as adapter_cls:
+            adapter_cls.return_value.complete.return_value = make_adapter_result(
+                '{"answer":"The evidence supports this claim."}'
+            )
+            res = _post_json(c, f"/api/evidence/jobs/{job.id}/chat/", {"question": "Test?"})
+        assert res.status_code in (200, 422)
+
+
 def test_chat_endpoint_returns_answer_and_sources(job, paper_a):
     with schema_context("demo"):
         from apps.evidence.models import AnswerRecord, RewardScore
@@ -296,6 +331,13 @@ def test_agent_requires_auth(job):
         assert res.status_code == 401
 
 
+def test_agent_endpoint_requires_auth(job):
+    with schema_context("demo"):
+        c = Client(HTTP_HOST="demo.localhost")
+        res = _post_json(c, f"/api/evidence/jobs/{job.id}/agent/", {"question": "Test?"})
+        assert res.status_code == 401
+
+
 def test_agent_endpoint_returns_loop_result(job, api_key):
     with schema_context("demo"):
         from apps.evidence.models import AnalysisJob
@@ -306,17 +348,19 @@ def test_agent_endpoint_returns_loop_result(job, api_key):
         c = _client(api_key)
         with patch("apps.evidence.router.run_agent", return_value={
             "session_id": "sess-123",
-            "final_answer": "Agent answer",
+            "question": "Test agent",
+            "answer": "Agent answer",
             "confidence": 0.87,
+            "reasoning": "Grounded answer.",
             "iterations": 2,
-            "trace_count": 4,
+            "model": "llama-3.3-70b-instruct",
         }):
             res = _post_json(c, f"/api/evidence/jobs/{job.id}/agent/", {"question": "Test agent"})
 
         assert res.status_code == 200
         data = res.json()
         assert data["job_id"] == job.id
-        assert data["final_answer"] == "Agent answer"
+        assert data["answer"] == "Agent answer"
         assert data["confidence"] == 0.87
 
 

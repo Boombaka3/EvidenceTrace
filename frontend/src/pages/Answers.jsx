@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { listAnswers } from '../api/client.js'
@@ -24,6 +25,7 @@ function AnswerBadge({ answer }) {
 
 export default function Answers() {
   const { id } = useParams()
+  const [expandedQuestionId, setExpandedQuestionId] = useState(null)
   const { data: answers, loading, error, isMock, refetch } = useApi(() => listAnswers(id), MOCK_ANSWERS, [id])
 
   return (
@@ -48,7 +50,7 @@ export default function Answers() {
             to={`/jobs/${id}/chat`}
             className="px-3 py-2 bg-[#5e6ad2] hover:bg-[#828fff] text-white text-sm rounded-[8px] transition-colors"
           >
-            Open Chat {'->'}
+            Chat {'->'}
           </Link>
         </div>
 
@@ -75,7 +77,18 @@ export default function Answers() {
             <tbody>
               {answers.map(answer => (
                 <tr key={answer.id} className="border-b border-[#23252a] hover:bg-[#0f1011] transition-colors">
-                  <td className="px-4 py-3 text-[#f7f8f8] text-sm max-w-sm">{answer.question}</td>
+                  <td className="px-4 py-3 text-[#f7f8f8] text-sm max-w-sm">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedQuestionId(current => current === answer.id ? null : answer.id)}
+                      className="text-left hover:text-[#828fff] transition-colors"
+                      title={answer.question}
+                    >
+                      {expandedQuestionId === answer.id || answer.question.length <= 60
+                        ? answer.question
+                        : `${answer.question.slice(0, 60)}...`}
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <AnswerBadge answer={answer.answer} />
                   </td>
@@ -83,7 +96,11 @@ export default function Answers() {
                     <ConfidenceBar score={answer.final_confidence} />
                   </td>
                   <td className="px-4 py-3 text-[#d0d6e0] text-xs">
-                    {answer.paper_title || '-'}
+                    <span title={answer.paper_title || '-'}>
+                      {(answer.paper_title || '-').length > 60
+                        ? `${(answer.paper_title || '-').slice(0, 60)}...`
+                        : (answer.paper_title || '-')}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">

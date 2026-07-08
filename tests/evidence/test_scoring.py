@@ -121,6 +121,13 @@ def test_parse_response_invalid_answer_normalizes():
     assert parsed["format_ok"] is False
 
 
+def test_parse_response_invalid_answer_tags_normalizes():
+    from apps.evidence.scoring.question_answerer import _parse_response
+
+    parsed = _parse_response("<think>x</think><answer>uncertain</answer>")
+    assert parsed["answer"] == "maybe"
+
+
 def test_clamp_bounds():
     from apps.evidence.scoring.question_answerer import _clamp
 
@@ -129,6 +136,7 @@ def test_clamp_bounds():
     assert _clamp(2) == 1.0
     assert _clamp("0.25") == pytest.approx(0.25)
     assert _clamp("bad") is None
+    assert _clamp(None) is None
 
 
 # ── NLI grounding tests ────────────────────────────────────────────────────────
@@ -149,6 +157,21 @@ def test_nli_grounding_empty_inputs_return_none():
     assert score_nli_grounding("", "abstract text") is None
     assert score_nli_grounding("reasoning", "") is None
     assert score_nli_grounding("", "") is None
+
+
+def test_nli_score_returns_valid(monkeypatch):
+    """score_nli_grounding returns float in [0,1] or None."""
+    from apps.evidence.scoring import nli_grounding
+
+    mock_model = MagicMock()
+    mock_model.predict.return_value = [[0.1, 0.8, 0.1]]
+    monkeypatch.setattr(nli_grounding, "_get_nli_model", lambda: mock_model)
+    result = nli_grounding.score_nli_grounding(
+        "Drug X reduces tumors.",
+        "Drug X reduces tumor size."
+    )
+    assert result is not None
+    assert 0.0 <= result <= 1.0
 
 
 # ── outcome_reward tests ──────────────────────────────────────────────────────
